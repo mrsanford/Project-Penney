@@ -11,7 +11,7 @@ The script simulates most combinations of P1 and P2 (of 64 total combinations - 
 
 ## **Quick Start Guide**
 In addition to the necessary versions and dependencies, the project is maintained using uv. Please check their website for more information regarding setup. To simply view the project, clone the repository and:
-'''
-print('testing')
-'''
+```
+print('test')
+```
 Then check the outputs in /reports.
