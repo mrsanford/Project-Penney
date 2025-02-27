@@ -14,4 +14,4 @@ In addition to the necessary versions and dependencies, the project is maintaine
 ```
 print('test')
 ```
-Then check the outputs in /reports.
+Then check the outputs in [/reports](url).
