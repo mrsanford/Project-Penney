@@ -1,16 +1,33 @@
 # **Project Penney Overview**
 
-This version of Project Penney is a 3-bit implementation. The game works where Player 1 (P1) selects a three card length combination of red and black cards, represented as RED = 0 or BLACK = 1.
-This is not actually a Penney game, rather it is a simulation which visualizes all combination outcomes on a set of 'randomly' shuffled decks so we can determine a play strategy for Player 2 (P2) since they are at the advantage from picking second. We want to see which combinations would maximize our wins/mimizes our losses. For P1, it is also seeing which combinations would be more likely to force a draw.
+This version of Project Penney is a 3-bit implementation. The game works where Player 1 (P1) selects a three card length combination of red and black cards, represented as RED = 0 or BLACK = 1. The project is a simulation designed to visualize and analyze combination outcomes in order to (1) help Player 2 (P2) to exploit the advantage of picking second through minimizing loss, maximizing wins, or increasing the chances of a draw. 
 
-The script generates a set of 'randomly shuffled' decks, which have been designed so testing is replicable and easily accessible (the seeds used for each shuffled deck has been stored). The shuffled decks are saved to .npz files in the ./data folder in this repository. The store_decks() function has been designed to provide the option to append newly generated decks to either the most recent file (indexed by number) or to create a new file of generated decks. It is an attempt at handling the generation of large quantities of shuffled decks more gracefully and avoids shuffled decks on replicated seeds.
-
-The script simulates most combinations of P1 and P2 (of 64 total combinations - 8 possible combos if P1 and P2 picked the same combination = 56 combinations simulated) on every shuffled deck. It loads the data from the most recent file in [/data](https://github.com/mrsanford/Project-Penney/tree/main/data). It counts cards and tricks for P1 and P2 in order to calculate wins; moreover, it will (hopefully) gracefully track unwon cards and handle ties. There are two 'outputs' which include a master dataframe, which holds the running counts of all out simulations and a heatmap derived from this data, which visualizes all the combinations.
+### Features
+- Deck shuffling and storing: the simulation has generated a set of easily reproducible and accessible seeds, which are used to shuffle the decks. The shuffled decks have been stored in .npz files in the [/data](https://github.com/mrsanford/Project-Penney/tree/main/data) folder. Considerations have been taking to allow for new decks to be either appended to existing ones, or for newly shuffled decks to be inputted into brand new files.
+- Simulation techniques: all combinations (56 of 64 total combinations) of P1 and P2's choices are simulated on every shuffled deck. *The missing 8 are derived from P2 choosing the same combination as P1, and the statistics of all the combination win probabilities can be found [here](https://en.wikipedia.org/wiki/Penney%27s_game#/media/File:Penney_game_graphs.svg)*
+- Result tracking: tricks and cards are counted for both players; additionally, wins, ties, and unwon cards are counted.
+- Visualizing: a master dataframe is outputted of all simulation results and heatmaps are generated of players' trick and card win percentages.
 
 --- 
 
 ## **Quick Start Guide**
-In addition to the necessary versions and dependencies, the project is maintained using uv. Please check their website for more information regarding setup. To simply view the project, clone the repository and run the script out main.py.
+Beginning with this repository will require you cloning  and installing the dependencies. Note: this project has been managed with uv, and more information regarding uv setup and management can be found [here](https://docs.astral.sh/uv/getting-started/installation/). To simply view the project, clone the repository and run the script out of main.py. An alternative set up is below:
+
+### Generate the Shuffled Decks
 ```
-print('test')
+from src.datagen import get_decks, store_decks
+decks, seeds = get_decks(n_decks=1000)
+store_decks(decks, seeds, filepath='./data')
+```
+### Run the Simulation
+```
+from src.datagen import simulate_combos, P1_COMBOS
+deck_file='./data'
+results = simulate_combos(deck_file,P1_COMBOS,P2_COMBOS=P1_COMBOS)
+```
+### Visualize Outputs
+```
+from src.datagen import score_game, plot_heatmaps
+score = score_game(results)
+plot_heatmaps(score['P1_trick_pct'], score['P1_card_pct'])
 ```
