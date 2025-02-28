@@ -2,7 +2,6 @@ import numpy as np
 import os
 import glob
 import pandas as pd
-import itertools
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -30,7 +29,15 @@ def get_decks(
     n_decks: int = 1000, seed: int = 42, half_deck_size: int = HALF_DECK_SIZE
 ) -> tuple[np.ndarray, np.ndarray]:
     """Efficiently generate `n_decks` shuffled decks using NumPy.
-    Returns: decks (np.ndarray): 2D array of shape (n_decks, num_cards), each row is a shuffled deck."""
+    ---
+    Arguments:
+    n_decks (int): number of shuffled decks to generate, default is 1000
+    seed (int): seed for random number generator, default is 42
+    half_deck_size (int): as mentioned, default is 5
+    Returns:
+    tuple containing
+     - decks (np.ndarray): 2D array of shape (n_decks, num_cards), each row is a shuffled deck.
+     - seeds (np.ndarray): Array of seeds used to shuffle the decks."""
     init_deck = [R] * half_deck_size + [B] * half_deck_size
     decks = np.tile(init_deck, (int(n_decks), 1))
     rng = np.random.default_rng(seed)
@@ -40,8 +47,15 @@ def get_decks(
 
 
 def latest_seed(filepath: str) -> int:
-    """Loads the latest seed that was last used based on the most recently saved file's datetime.
-    If the file path isn't found, this is defaulted to random_state 42."""
+    """
+    Loads the latest seed last used based on the most recently saved iterative file
+    If the file path isn't found, the default random seed is 42
+    ---
+    Arguments:
+    filepath (str): path to the folder containing the shuffled deck files (/data)
+    Returns:
+    int: the latest seed used and incremented by 1
+    """
     files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
     if not files:
         return 42
@@ -50,6 +64,12 @@ def latest_seed(filepath: str) -> int:
 
 
 def latest_deck(filepath: str) -> Path | None:
+    """
+    Finds the most recent shuffled deck file based on the filename pattern
+    ---
+    Arguments: filepath (str)
+    Returns: either the most recent deck file or not returning anything if the files aren't found
+    """
     files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
     return files[-1] if files else None
 
@@ -60,7 +80,14 @@ def store_decks(
     filepath: str = "./data",
     append_file: bool = True,
 ) -> None:
-    """Stores shuffled decks and respective seeds in the .npz file."""
+    """Stores shuffled decks and respective seeds in the .npz file
+    ---
+    Arguments:
+    decks (np.ndarray): 2D array of shuffled decks to store
+    seeds (np.ndarray): array of seeds associated with the decks
+    filepath (str)
+    append_file (bool): option to append to the most recent file or store a new one (default is `True`)
+    """
     os.makedirs(filepath, exist_ok=True)
     latest_file = latest_deck(filepath)
     if append_file and latest_file:
@@ -84,16 +111,30 @@ def store_decks(
 
 
 def load_decks(filepath: str) -> np.ndarray:
-    """Loads the most recent deck file dynamically in preparation for Monte Carlo"""
+    """Dynamically loads the most recent deck file dynamically
+    ---
+    Arguments: filepath (str)
+    Returns: np.ndarray of loaded decks from the most recent '.npz' file
+    Raises: FileNotFoundError: if no shuffled deck files are found
+    """
     latest_file = latest_deck(filepath)
     print(f"Looking for latest deck file in: {filepath}")
     if latest_file is None:
         raise FileNotFoundError("No shuffled decks found.")
-    print(f"Loading deck file: {latest_file}")
+    # print(f"Loading deck file: {latest_file}")
     return np.load(latest_file)["decks"]
 
 
 def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+    """
+    Counts the number of each tricks each player wins based on the combos
+    ---
+    Arguments:
+    deck (np.ndarray): the shuffled deck of cards
+    P1_combo (np.ndarray): P1's combination
+    P2_combo (np.ndarray): P2's combination
+    Returns: tuple of the number of tricks won per player
+    """
     print(f"Deck: {deck}")
     P1_tricks = P2_tricks = 0
     combo_length = len(P1_combo)
@@ -112,6 +153,12 @@ def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
 
 
 def count_cards(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+    """
+    Counts the total number of cards won per player
+    ---
+    Arguments: same for count_tricks
+    Return: same for count_tricks
+    """
     P1_cards = P2_cards = 0
     unwon_cards = 0
     combo_length = len(P1_combo)
@@ -135,16 +182,22 @@ def count_cards(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
 def simulate_combos(
     deck_file: str, P1_combos: np.ndarray, P2_combos: np.ndarray
 ) -> np.ndarray:
-    """Simulate the game for all combinations and all shuffled decks."""
+    """
+    Simulate the game for all combinations and all available shuffled decks
+    ---
+    Arguments:
+    deck_file (str): path to the file of shuffled decks
+    P1_combos (np.ndarray): P1's possible combinations in an array
+    P2_combos (np.ndarray): P2's possible combinations in an array
+    Return:
+    np.ndarray: A 2D array of shape (n_combinations * n_decks, 7) containing the results for each combination
+    (deck_id, P1_combo, P2_combo, P1_tricks, P2_tricks, P1_cards, P2_cards).
+    """
     decks = load_decks(deck_file)
-    # print(f"Decks loaded: {decks.shape}")
     all_results = []
     for deck_id, deck in enumerate(decks):
         for P1_combo in P1_combos:
             for P2_combo in P2_combos:
-                # print(
-                #     f"Simulating deck {deck_id} with combination {P1_combo} vs {P2_combo}"
-                # )
                 P1_tricks, P2_tricks = count_tricks(deck, P1_combo, P2_combo)
                 P1_cards, P2_cards = count_cards(deck, P1_combo, P2_combo)
                 result_row = np.array(
@@ -161,12 +214,19 @@ def simulate_combos(
                 )
                 all_results.append(result_row)
         all_results_arr = np.vstack(all_results)
-        print(f"Simulate Combos Output Shape: {np.vstack(all_results).shape}")
+        # print(f"Simulate Combos Output Shape: {np.vstack(all_results).shape}")
         return all_results_arr
 
 
 def score_game(results: np.ndarray):
-    """Tallies the points for P1 and P2 based on tricks and cards, computes percentages"""
+    """
+    Tallies the points for P1 and P2 based on tricks and cards, computes percentages
+    ---
+    Arguments:
+    results (np.ndarray): the results of the simulation containing the trick and card counts for each game
+    Returns:
+    dict: a dictionary containing P1 and P2's scores and the overall winner
+    """
     # Count Trick Wins
     trick_winner = np.where(results[:, 3] == 1, 1, np.where(results[:, 3] == 2, 2, 0))
     P1_trick_wins = np.sum(trick_winner == 1)
@@ -196,8 +256,6 @@ def score_game(results: np.ndarray):
 
 def plot_heatmaps(p1_trick_pct, p1_card_pct):
     """Plot heatmaps for Player 1 vs Player 2 win probabilities based on tricks and cards."""
-    print(f"Player 1 Trick %:\n{p1_trick_pct}")
-    print(f"Player 1 Card %:\n{p1_card_pct}")
     # Mask out invalid diagonal cells (same combo vs same combo)
     mask = np.eye(len(P1_COMBOS), dtype=bool)
     # Ensure that win percentages are between 0 and 100 (scale if needed)
