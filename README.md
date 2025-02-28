@@ -8,7 +8,7 @@ This version of Project Penney is a 3-bit implementation. The game works where P
 - Result tracking: tricks and cards are counted for both players; additionally, wins, ties, and unwon cards are counted.
 - Visualizing: a master dataframe is outputted of all simulation results and heatmaps are generated of players' trick and card win percentages.
 
-### Disclaimer: this project is not a game rather it is a simulation and visualization tool to aid in optimizing 3-bit Penney's games. 
+#### Disclaimer: this project is not a game rather it is a simulation and visualization tool to aid in optimizing 3-bit Penney's games. 
 
 --- 
 
