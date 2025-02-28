@@ -118,7 +118,7 @@ def load_decks(filepath: str) -> np.ndarray:
     Raises: FileNotFoundError: if no shuffled deck files are found
     """
     latest_file = latest_deck(filepath)
-    print(f"Looking for latest deck file in: {filepath}")
+    # print(f"Looking for latest deck file in: {filepath}")
     if latest_file is None:
         raise FileNotFoundError("No shuffled decks found.")
     # print(f"Loading deck file: {latest_file}")
@@ -135,7 +135,7 @@ def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
     P2_combo (np.ndarray): P2's combination
     Returns: tuple of the number of tricks won per player
     """
-    print(f"Deck: {deck}")
+    # print(f"Deck: {deck}")
     P1_tricks = P2_tricks = 0
     combo_length = len(P1_combo)
     i = 0
