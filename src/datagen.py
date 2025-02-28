@@ -1,44 +1,37 @@
 import numpy as np
 import os
 import glob
+import pandas as pd
+import itertools
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 # from src.datagen import PATH_INFO
 
 HALF_DECK_SIZE = 5
-RED = 0
-BLACK = 1
+R, B = 0, 1  # Red and Black
 
-# 8 possible combos
-ALL_COMBOS = np.array(
+# there are 8 possible P1 combos
+P1_COMBOS = np.array(
     [
-        [0, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-        [0, 1, 1],
-        [1, 0, 0],
-        [1, 0, 1],
-        [1, 1, 0],
-        [1, 1, 1],
+        [R, R, R],
+        [R, R, B],
+        [R, B, R],
+        [R, B, B],
+        [B, R, R],
+        [B, R, B],
+        [B, B, R],
+        [B, B, B],
     ]
 )
 
 
 def get_decks(
-    n_decks: int, seed: int, half_deck_size: int = HALF_DECK_SIZE
+    n_decks: int = 1000, seed: int = 42, half_deck_size: int = HALF_DECK_SIZE
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Efficiently generate `n_decks` shuffled decks using NumPy.
-    Returns: decks (np.ndarray): 2D array of shape (n_decks, num_cards), each row is a shuffled deck.
-    """
-    print(
-        f"Inside get_decks: n_decks type: {type(n_decks)}, value: {n_decks}"
-    )  # Debug print
-
-    if not isinstance(n_decks, int):  # Ensure it's an integer
-        raise TypeError(f"Expected n_decks to be an integer, but got {type(n_decks)}")
-    init_deck = [0] * half_deck_size + [1] * half_deck_size
+    """Efficiently generate `n_decks` shuffled decks using NumPy.
+    Returns: decks (np.ndarray): 2D array of shape (n_decks, num_cards), each row is a shuffled deck."""
+    init_deck = [R] * half_deck_size + [B] * half_deck_size
     decks = np.tile(init_deck, (int(n_decks), 1))
     rng = np.random.default_rng(seed)
     rng.permuted(decks, axis=1, out=decks)
@@ -46,141 +39,198 @@ def get_decks(
     return decks, seeds
 
 
-# The results are replicable and additional decks may be generated in addition to the other decks
+def latest_seed(filepath: str) -> int:
+    """Loads the latest seed that was last used based on the most recently saved file's datetime.
+    If the file path isn't found, this is defaulted to random_state 42."""
+    files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
+    if not files:
+        return 42
+    data = np.load(files[-1])
+    return data["seeds"][-1] + 1
+
+
+def latest_deck(filepath: str) -> Path | None:
+    files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
+    return files[-1] if files else None
+
+
 def store_decks(
     decks: np.ndarray,
     seeds: np.ndarray,
-    filepath: str = Path("./data"),
+    filepath: str = "./data",
     append_file: bool = True,
 ) -> None:
-    """
-    Stores the shuffled decks and 'random' seeds used in np.arrays via time and date it was stored,
-    saving it as the timestamp as the name. If the file exists, it appends the new shuffled decks and
-    seeds to the existing file.
-    """
+    """Stores shuffled decks and respective seeds in the .npz file."""
     os.makedirs(filepath, exist_ok=True)
-    files = glob.glob(os.path.join(filepath, "shuffled_decks_*.npz"))
-    if append_file and files:
-        files.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
-        latest_file = files[-1]
-        loaded = np.load(latest_file)
-        stored_decks = loaded["decks"]
-        stored_seeds = loaded["seeds"]
-        decks = np.vstack((stored_decks, decks))
-        seeds = np.concatenate((stored_seeds, seeds))
+    latest_file = latest_deck(filepath)
+    if append_file and latest_file:
+        data = np.load(latest_file)
+        if "decks" in data.files and "seeds" in data.files:
+            stored_decks = data["decks"]
+            stored_seeds = data["seeds"]
+            latest_used_seed = stored_seeds[-1]
+            new_seeds = np.arange(
+                latest_used_seed + 1, latest_used_seed + 1 + len(decks)
+            )
+            decks = np.vstack((stored_decks, decks))
+            seeds = np.concatenate((stored_seeds, new_seeds))
+        np.savez_compressed(latest_file, decks=decks, seeds=seeds)
+        print(f"Appended decks to {latest_file}")
     else:
-        new_index = 1 if not files else len(files) + 1
-        latest_file = os.path.join(filepath, f"shuffled_decks_{new_index}.npz")
-
-    np.savez_compressed(latest_file, decks=decks, seeds=seeds)
-    print(f"Shuffled decks stored to {latest_file}")
-
-
-def latest_seed(filepath: str) -> int:
-    """
-    Loads the latest seed that was last used based on the most recently saved file's datetime.
-    If the file path isn't found, this is defaulted to random_state 42.
-    """
-    files = glob.glob(os.path.join(filepath, "shuffled_decks_*.npz"))
-    if not files:
-        return 42
-    files.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
-    latest_file = files[-1]
-    loaded = np.load(latest_file)
-    return loaded["seeds"][-1] + 1
+        new_index = len(list(Path(filepath).glob("shuffled_decks_*.npz"))) + 1
+        new_file = os.path.join(filepath, f"shuffled_decks_{new_index}.npz")
+        np.savez_compressed(new_file, decks=decks, seeds=seeds)
+        print(f"Stored new deck file: {new_file}")
 
 
-# Note: there are only max 8 possible combinations that player 1 can generate
-def player1(n_simulations: int):
-    """Generates P1's combos by randomly selecting from the 8 possible combos
-    Just samples from the indices 0 to 7
-    """
-    indices = np.random.randint(0, len(ALL_COMBOS), n_simulations)
-    player1_combos = ALL_COMBOS[indices]
-    return player1_combos
+def load_decks(filepath: str) -> np.ndarray:
+    """Loads the most recent deck file dynamically in preparation for Monte Carlo"""
+    latest_file = latest_deck(filepath)
+    print(f"Looking for latest deck file in: {filepath}")
+    if latest_file is None:
+        raise FileNotFoundError("No shuffled decks found.")
+    print(f"Loading deck file: {latest_file}")
+    return np.load(latest_file)["decks"]
 
 
-# Note: thinking is that .copy() logic is fine because of the limited number of unique potential combos from P1
-def player2(player1_combos: np.ndarray):
-    """Takes the return from player1 to modify player2's output
-    Function inverts the second value of P1's combo and shifts P1's first and second values to P2's 2nd and 3rd place
-    """
-    player2_combos = player1_combos.copy()
-    player2_combos[:, 0] = 1 - player1_combos[:, 1]
-    player2_combos[:, 1] = player1_combos[:, 0]
-    player2_combos[:, 2] = player1_combos[:, 1]
-    return player2_combos
+def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+    print(f"Deck: {deck}")
+    P1_tricks = P2_tricks = 0
+    combo_length = len(P1_combo)
+    i = 0
+    while i <= len(deck) - combo_length:
+        triplet = deck[i : i + combo_length]
+        if np.array_equal(triplet, P1_combo):
+            P1_tricks += 1
+            i += combo_length
+        elif np.array_equal(triplet, P2_combo):
+            P2_tricks += 1
+            i += combo_length
+        else:
+            i += 1
+    return P1_tricks, P2_tricks
 
 
-def rolling_window(arr, window_size):
-    shape = (arr.shape[0], arr.shape[1] - window_size + 1, window_size)
-    strides = (arr.strides[0], arr.strides[1], arr.strides[1])
-    return np.lib.stride_tricks.as_strided(arr, shape=shape, strides=strides)
+def count_cards(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+    P1_cards = P2_cards = 0
+    unwon_cards = 0
+    combo_length = len(P1_combo)
+    i = 0
+    while i <= len(deck) - combo_length:
+        triplet = deck[i : i + combo_length]
+        if np.array_equal(triplet, P1_combo):
+            P1_cards += combo_length + unwon_cards
+            unwon_cards = 0
+            i += combo_length
+        elif np.array_equal(triplet, P2_combo):
+            P2_cards += combo_length + unwon_cards
+            unwon_cards = 0
+            i += combo_length
+        else:
+            unwon_cards += 1
+            i += 1
+    return P1_cards, P2_cards
 
 
-def add_trick(matches):
-    trick_count = np.sum(matches, axis=1)
-    return trick_count
+def simulate_combos(
+    deck_file: str, P1_combos: np.ndarray, P2_combos: np.ndarray
+) -> np.ndarray:
+    """Simulate the game for all combinations and all shuffled decks."""
+    decks = load_decks(deck_file)
+    # print(f"Decks loaded: {decks.shape}")
+    all_results = []
+    for deck_id, deck in enumerate(decks):
+        for P1_combo in P1_combos:
+            for P2_combo in P2_combos:
+                # print(
+                #     f"Simulating deck {deck_id} with combination {P1_combo} vs {P2_combo}"
+                # )
+                P1_tricks, P2_tricks = count_tricks(deck, P1_combo, P2_combo)
+                P1_cards, P2_cards = count_cards(deck, P1_combo, P2_combo)
+                result_row = np.array(
+                    [
+                        deck_id,
+                        P1_combo,
+                        P2_combo,
+                        P1_tricks,
+                        P2_tricks,
+                        P1_cards,
+                        P2_cards,
+                    ],
+                    dtype=object,
+                )
+                all_results.append(result_row)
+        all_results_arr = np.vstack(all_results)
+        print(f"Simulate Combos Output Shape: {np.vstack(all_results).shape}")
+        return all_results_arr
 
 
-def add_cards(matches, decks):
-    won_cards = np.zeros(matches.shape[0], dtype=int)
-    for i in range(matches.shape[0]):
-        last_win_idx = -1
-        for j in range(matches.shape[1]):
-            if matches[i, j]:
-                won_cards[i] += j - last_win_idx
-                last_win_idx = j
-    return won_cards
+def score_game(results: np.ndarray):
+    """Tallies the points for P1 and P2 based on tricks and cards, computes percentages"""
+    # Count Trick Wins
+    trick_winner = np.where(results[:, 3] == 1, 1, np.where(results[:, 3] == 2, 2, 0))
+    P1_trick_wins = np.sum(trick_winner == 1)
+    P2_trick_wins = np.sum(trick_winner == 2)
+    # Count Card Wins
+    card_winner = np.where(results[:, 5] == 1, 1, np.where(results[:, 5] == 2, 2, 0))
+    P1_card_wins = np.sum(card_winner == 1)
+    P2_card_wins = np.sum(card_winner == 2)
+    # Calculate win percentages based on tricks and cards
+    total_games = len(results)
+    # Trick and Card Percentages
+    P1_trick_pct = (P1_trick_wins / total_games) * 100
+    P2_trick_pct = (P2_trick_wins / total_games) * 100
+    P1_card_pct = (P1_card_wins / total_games) * 100
+    P2_card_pct = (P2_card_wins / total_games) * 100
+    # Draw Percentage (both trick and card are ties)
+    draw_pct = np.sum((trick_winner == 0) & (card_winner == 0)) / total_games * 100
+    # Return all statistics in a dictionary or tuple for easy access
+    return {
+        "P1_trick_pct": P1_trick_pct,
+        "P2_trick_pct": P2_trick_pct,
+        "P1_card_pct": P1_card_pct,
+        "P2_card_pct": P2_card_pct,
+        "draw_pct": draw_pct,
+    }
 
 
-def monte_carlo(
-    n_decks: int = 5,
-    n_simulations: int = 10,
-    half_deck_size: int = HALF_DECK_SIZE,
-    seed: int = 42,
-):
-    """A vectorized approach to the Monte Carlo simulation, tracks the tricks and cards won, hopefully"""
-    decks, _ = get_decks(n_decks, seed=seed)
-    player1_combos = player1(n_simulations)
-    player2_combos = player2(player1_combos)
-
-    windowed_decks = rolling_window(decks, player1_combos.shape[1])
-    p1_matches = np.all(windowed_decks == player1_combos[:, None, :], axis=2)
-    p2_matches = np.all(windowed_decks == player2_combos[:, None, :], axis=2)
-
-    p1_tricks = add_trick(p1_matches)
-    p2_tricks = add_trick(p2_matches)
-
-    p1_cards = add_cards(p1_matches, decks)
-    p2_cards = add_cards(p2_matches, decks)
-
-    total_cards = half_deck_size * 2
-    p1_unwon = total_cards - (p1_cards + p2_cards)
-
-    player1_win_probability = np.sum(p1_tricks > p2_tricks) / n_simulations
-    player2_win_probability = np.sum(p2_tricks > p1_tricks) / n_simulations
-
-    return player1_win_probability, player2_win_probability
-
-
-# Heatmap
-prob_matrix = np.empty((8, 8))
-for i, p1_combo in enumerate(ALL_COMBOS):
-    p2_combo = player2(p1_combo.reshape(1, -1))
-    p1_win_prob, _ = monte_carlo(n_simulations=1)
-    prob_matrix[i] = p1_win_prob
-
-plt.figure(figsize=(8, 6))
-sns.heatmap(
-    prob_matrix,
-    annot=True,
-    fmt=".2f",
-    cmap="coolwarm",
-    xticklabels=ALL_COMBOS,
-    yticklabels=ALL_COMBOS,
-)
-plt.xlabel("Player 2 Combination")
-plt.ylabel("Player 1 Combination")
-plt.title("Heatmap of Player 1 Win Probabilities")
-plt.show()
+def plot_heatmaps(p1_trick_pct, p1_card_pct):
+    """Plot heatmaps for Player 1 vs Player 2 win probabilities based on tricks and cards."""
+    print(f"Player 1 Trick %:\n{p1_trick_pct}")
+    print(f"Player 1 Card %:\n{p1_card_pct}")
+    # Mask out invalid diagonal cells (same combo vs same combo)
+    mask = np.eye(len(P1_COMBOS), dtype=bool)
+    # Ensure that win percentages are between 0 and 100 (scale if needed)
+    p1_trick_pct = np.clip(p1_trick_pct, 0, 100)
+    p1_card_pct = np.clip(p1_card_pct, 0, 100)
+    # Color palette for heatmaps
+    cmap = sns.color_palette("coolwarm", as_cmap=True)
+    cmap.set_bad(color="lightgrey")  # This makes the diagonal grey
+    # Generate the labels dynamically based on binary values
+    labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in P1_COMBOS]
+    # Set up figure for two subplots
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=100)
+    # Common heatmap settings
+    heatmap_kws = {
+        "annot": True,
+        "fmt": ".1f",
+        "xticklabels": labels,
+        "yticklabels": labels,
+        "vmin": 0,
+        "vmax": 100,
+        "cbar_kws": {"shrink": 0.8},
+        "cmap": cmap,
+        "mask": mask,
+    }
+    # Plot Player Trick Win Probability Heatmap
+    sns.heatmap(p1_trick_pct, ax=axes[0], **heatmap_kws)
+    axes[0].set_title("Player Trick Win Probability (%)")
+    axes[0].set_xlabel("Player 2 Combination")
+    axes[0].set_ylabel("Player 1 Combination")
+    # Plot Player Card Win Probability Heatmap
+    sns.heatmap(p1_card_pct, ax=axes[1], **heatmap_kws)
+    axes[1].set_title("Player Card Win Probability (%)")
+    axes[1].set_xlabel("Player 2 Combination")
+    axes[1].set_ylabel("Player 1 Combination")
+    plt.tight_layout()
+    plt.show()
