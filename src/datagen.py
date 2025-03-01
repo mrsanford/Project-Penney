@@ -5,7 +5,15 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
-# from src.datagen import PATH_INFO
+from src.helpers import (
+    BASE_DIR,
+    DATA_DIR,
+    RESULTS_DIR,
+    PLOTS_DIR,
+    LOGS_DIR,
+    LATEST_RESULTS_FILE,
+    LATEST_DECK_FILE_PATTERN,
+)
 
 HALF_DECK_SIZE = 5
 R, B = 0, 1  # Red and Black
@@ -13,15 +21,16 @@ R, B = 0, 1  # Red and Black
 # there are 8 possible P1 combos
 P1_COMBOS = np.array(
     [
-        [R, R, R],
-        [R, R, B],
-        [R, B, R],
-        [R, B, B],
-        [B, R, R],
-        [B, R, B],
-        [B, B, R],
-        [B, B, B],
-    ]
+        (R, R, R),
+        (R, R, B),
+        (R, B, R),
+        (R, B, B),
+        (B, R, R),
+        (B, R, B),
+        (B, B, R),
+        (B, B, B),
+    ],
+    dtype=object,
 )
 
 
@@ -46,21 +55,23 @@ def get_decks(
     return decks, seeds
 
 
-def latest_deck(filepath: str) -> Path | None:
+def latest_deck_file(directory: str) -> Path:
     """
-    Finds the most recent shuffled deck file based on the filename pattern
+    Finds the most recent shuffled deck file based on the filename pattern in a given directory
     ---
-    Arguments: filepath (str)
+    Arguments: directory (str): path to folder where the deck files are located
     Returns: either the most recent deck file or not returning anything if the files aren't found
     """
-    files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
-    return files[-1] if files else None
+    files = sorted(Path(directory).glob("shuffled_decks_*.npz"))
+    if not files:
+        raise FileNotFoundError(f"No shuffled deck files found in {directory}")
+    return files[-1]
 
 
 def store_decks(
     decks: np.ndarray,
     seeds: np.ndarray,
-    filepath: str = "./data",
+    directory: str = "./data",
     append_file: bool = True,
 ) -> None:
     """Stores shuffled decks and respective seeds in the .npz file
@@ -68,11 +79,12 @@ def store_decks(
     Arguments:
     decks (np.ndarray): 2D array of shuffled decks to store
     seeds (np.ndarray): array of seeds associated with the decks
-    filepath (str)
+    directory (str)
     append_file (bool): option to append to the most recent file or store a new one (default is `True`)
     """
-    os.makedirs(filepath, exist_ok=True)
-    latest_file = latest_deck(filepath)
+    os.makedirs(directory, exist_ok=True)
+    latest_file = latest_deck_file(directory)
+
     if append_file and latest_file:
         data = np.load(latest_file)
         if "decks" in data.files and "seeds" in data.files:
@@ -87,28 +99,35 @@ def store_decks(
         np.savez_compressed(latest_file, decks=decks, seeds=seeds)
         print(f"Appended decks to {latest_file}")
     else:
-        new_index = len(list(Path(filepath).glob("shuffled_decks_*.npz"))) + 1
-        new_file = os.path.join(filepath, f"shuffled_decks_{new_index}.npz")
+        new_index = len(list(Path(directory).glob("shuffled_decks_*.npz"))) + 1
+        new_file = os.path.join(directory, f"shuffled_decks_{new_index}.npz")
         np.savez_compressed(new_file, decks=decks, seeds=seeds)
         print(f"Stored new deck file: {new_file}")
 
 
-def load_decks(filepath: str) -> np.ndarray:
+def load_decks(directory: str = "./data") -> np.ndarray:
     """Dynamically loads the most recent deck file dynamically
     ---
-    Arguments: filepath (str)
+    Arguments: directory (str)
     Returns: np.ndarray of loaded decks from the most recent '.npz' file
     Raises: FileNotFoundError: if no shuffled deck files are found
     """
-    latest_file = latest_deck(filepath)
-    # print(f"Looking for latest deck file in: {filepath}")
+    latest_file = latest_deck_file(directory)
     if latest_file is None:
         raise FileNotFoundError("No shuffled decks found.")
-    # print(f"Loading deck file: {latest_file}")
-    return np.load(latest_file)["decks"]
+    data = np.load(latest_file)
+    return data["decks"]
 
 
-def find_tricks(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
+def combo_to_str(combo: tuple[int, int, int]) -> str:
+    return "".join("R" if x == R else "B" for x in combo)
+
+
+def combo_from_str(combo_str: str) -> tuple[int, int, int]:
+    return tuple(R if ch == "R" else B for ch in combo_str)
+
+
+def find_tricks(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> tuple[int, int]:
     """
     Scans the deck to find/count tricks for each player. After the trick is found,
     the sequence gets cut and continues at the next card.
@@ -143,7 +162,7 @@ def find_tricks(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
     return P1_tricks, P2_tricks
 
 
-def count_cards(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
+def count_cards(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> tuple[int, int]:
     """
     Counts total cards won per player (including unclaimed cards between tricks).
     ---
@@ -184,8 +203,8 @@ def count_cards(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
 
 
 def simulate_combos(
-    deck_file: str, P1_combos: np.ndarray, P2_combos: np.ndarray
-) -> np.ndarray:
+    decks: np.ndarray, P1_combos: tuple, P2_combos: tuple
+) -> pd.DataFrame:
     """
     Simulate the game for all combinations and all available shuffled decks
     ---
@@ -197,84 +216,82 @@ def simulate_combos(
     np.ndarray: A 2D array of shape (n_combinations * n_decks, 7) containing the results for each combination
     (deck_id, P1_combo, P2_combo, P1_tricks, P2_tricks, P1_cards, P2_cards).
     """
-    decks = load_decks(deck_file)
-    all_results = []
+    decks = load_decks(directory="./data")
+    results = []
     for deck_id, deck in enumerate(decks):
         for P1_combo in P1_combos:
             for P2_combo in P2_combos:
-                P1_tricks, P2_tricks = count_tricks(deck, P1_combo, P2_combo)
+                if np.array_equal(P1_combo, P2_combo):
+                    continue
+                P1_tricks, P2_tricks = find_tricks(deck, P1_combo, P2_combo)
                 P1_cards, P2_cards = count_cards(deck, P1_combo, P2_combo)
-                result_row = np.array(
-                    [
-                        deck_id,
-                        P1_combo,
-                        P2_combo,
-                        P1_tricks,
-                        P2_tricks,
-                        P1_cards,
-                        P2_cards,
-                    ],
-                    dtype=object,
+                trick_tie = 1 if P1_tricks == P2_tricks else 0
+                card_tie = 1 if P1_cards == P2_cards else 0
+                results.append(
+                    {
+                        "deck_id": deck_id,
+                        "P1_combo": combo_to_str(P1_combo),
+                        "P2_combo": combo_to_str(P2_combo),
+                        "P1_tricks": P1_tricks,
+                        "P2_tricks": P2_tricks,
+                        "trick_tie": trick_tie,
+                        "P1_cards": P1_cards,
+                        "P2_cards": P2_cards,
+                        "card_tie": card_tie,
+                    }
                 )
-                all_results.append(result_row)
-        all_results_arr = np.vstack(all_results)
-        # print(f"Simulate Combos Output Shape: {np.vstack(all_results).shape}")
-        return all_results_arr
+    df = pd.DataFrame(results)
+    os.makedirs("./results", exist_ok=True)
+    output_file = "./results/testing.csv"
+    if os.path.exists(output_file):
+        df.to_csv(output_file, mode="a", header=False, index=False)
+    else:
+        df.to_csv(output_file, index=False)
+    return df
 
 
-def score_game(results: np.ndarray):
+def score_summarize(results_file: str | Path = Path("./results/testing.csv")):
     """
-    Tallies the points for P1 and P2 based on tricks and cards, computes percentages
+    Reads the game results from a CSV file, computes trick and card win percentages,
+    and writes/updates the summary CSV with those statistics. The outputs are used for the heatmaps.
     ---
     Arguments:
-    results (np.ndarray): the results of the simulation containing the trick and card counts for each game
-    Returns:
-    dict: a dictionary containing P1 and P2's scores and the overall winner
+    results_file (str): Path to the raw game results CSV.
+    summary_file (str): Path to the summary file to append results.
     """
-    # Count Trick Wins
-    trick_winner = np.where(results[:, 3] == 1, 1, np.where(results[:, 3] == 2, 2, 0))
-    P1_trick_wins = np.sum(trick_winner == 1)
-    P2_trick_wins = np.sum(trick_winner == 2)
-    # Count Card Wins
-    card_winner = np.where(results[:, 5] == 1, 1, np.where(results[:, 5] == 2, 2, 0))
-    P1_card_wins = np.sum(card_winner == 1)
-    P2_card_wins = np.sum(card_winner == 2)
-    # Calculate win percentages based on tricks and cards
-    total_games = len(results)
-    # Trick and Card Percentages
-    P1_trick_pct = (P1_trick_wins / total_games) * 100
-    P2_trick_pct = (P2_trick_wins / total_games) * 100
-    P1_card_pct = (P1_card_wins / total_games) * 100
-    P2_card_pct = (P2_card_wins / total_games) * 100
-    # Draw Percentage (both trick and card are ties)
-    draw_pct = np.sum((trick_winner == 0) & (card_winner == 0)) / total_games * 100
-    # Return all statistics in a dictionary or tuple for easy access
-    return {
-        "P1_trick_pct": P1_trick_pct,
-        "P2_trick_pct": P2_trick_pct,
-        "P1_card_pct": P1_card_pct,
-        "P2_card_pct": P2_card_pct,
-        "draw_pct": draw_pct,
-    }
-    # also save this output in a dataframe called totals.csv with the iterative counts of all the updated results
+    results_df = pd.read_csv(results_file)
+    COMBO_STRINGS = [combo_to_str(combo) for combo in P1_COMBOS]
+    p2_trick_pct = np.zeros((8, 8), dtype=float)
+    p2_card_pct = np.zeros((8, 8), dtype=float)
+
+    for i, p1_combo_str in enumerate(COMBO_STRINGS):
+        for j, p2_combo_str in enumerate(COMBO_STRINGS):
+            if p1_combo_str == p2_combo_str:
+                p2_trick_pct[j, i] = np.nan
+                p2_card_pct[j, i] = np.nan
+                continue
+            matchup = results_df[
+                (results_df["P1_combo"] == p1_combo_str)
+                & (results_df["P2_combo"] == p2_combo_str)
+            ]
+            if len(matchup) == 0:
+                p2_trick_pct[j, i] = np.nan
+                p2_card_pct[j, i] = np.nan
+                continue
+            p2_trick_wins = np.sum(matchup["P2_tricks"] > matchup["P1_tricks"])
+            p2_card_wins = np.sum(matchup["P2_cards"] > matchup["P1_cards"])
+
+            p2_trick_pct[j, i] = (p2_trick_wins / len(matchup)) * 100
+            p2_card_pct[j, i] = (p2_card_wins / len(matchup)) * 100
+    return p2_trick_pct, p2_card_pct
 
 
-# score on tricks
-def plot_heatmaps(p1_trick_pct, p1_card_pct):
-    """Plot heatmaps for Player 1 vs Player 2 win probabilities based on tricks and cards."""
-    # Mask out invalid diagonal cells (same combo vs same combo)
+def plot_heatmaps(p2_trick_pct, p2_card_pct):
     mask = np.eye(len(P1_COMBOS), dtype=bool)
-    # Ensure that win percentages are between 0 and 100 (scale if needed)
-    p1_trick_pct = np.clip(p1_trick_pct, 0, 100)
-    p1_card_pct = np.clip(p1_card_pct, 0, 100)
-    # Color palette for heatmaps
     cmap = sns.color_palette("coolwarm", as_cmap=True)
-    cmap.set_bad(color="lightgrey")  # This makes the diagonal grey
-    # Generate the labels dynamically based on binary values
+    cmap = cmap.with_extremes(bad="lightgrey")
     labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in P1_COMBOS]
-    # Set up figure for two subplots
     fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=100)
-    # Common heatmap settings
     heatmap_kws = {
         "annot": True,
         "fmt": ".1f",
@@ -286,15 +303,14 @@ def plot_heatmaps(p1_trick_pct, p1_card_pct):
         "cmap": cmap,
         "mask": mask,
     }
-    # Plot Player Trick Win Probability Heatmap
-    sns.heatmap(p1_trick_pct, ax=axes[0], **heatmap_kws)
-    axes[0].set_title("Player Trick Win Probability (%)")
-    axes[0].set_xlabel("Player 2 Combination")
-    axes[0].set_ylabel("Player 1 Combination")
-    # Plot Player Card Win Probability Heatmap
-    sns.heatmap(p1_card_pct, ax=axes[1], **heatmap_kws)
-    axes[1].set_title("Player Card Win Probability (%)")
-    axes[1].set_xlabel("Player 2 Combination")
-    axes[1].set_ylabel("Player 1 Combination")
+    sns.heatmap(p2_trick_pct, ax=axes[0], **heatmap_kws)
+    axes[0].set_title("P2 Trick Win Probability (%)")
+    axes[0].set_xlabel("Player 1 Combination")
+    axes[0].set_ylabel("Player 2 Combination")
+
+    sns.heatmap(p2_card_pct, ax=axes[1], **heatmap_kws)
+    axes[1].set_title("P2 Card Win Probability (%)")
+    axes[1].set_xlabel("Player 1 Combination")
+    axes[1].set_ylabel("Player 2 Combination")
     plt.tight_layout()
     plt.show()

@@ -1,9 +1,17 @@
 from typing import Callable
 from datetime import datetime as dt
+from pathlib import Path
 
-# consider putting all the path information in a dictionary so its easily accessible by key?
-# PATH_INFO = {PATH_DATA:'Users/michellesanford/Documents/Github/Project-Penney/data',
-#             PATH_FIGURES:'Users/michellesanford/Documents/Github/Project-Penney/figures'}
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+DATA_DIR = BASE_DIR / "data"
+RESULTS_DIR = BASE_DIR / "results"
+PLOTS_DIR = BASE_DIR / "plots"
+LOGS_DIR = BASE_DIR / "logs"
+
+LATEST_RESULTS_FILE = RESULTS_DIR / "testing.csv"
+LATEST_DECK_FILE_PATTERN = DATA_DIR / "shuffled_decks_*.npz"
+
 
 def debugger_factory(show_args=True) -> Callable:
     def debugger(func: Callable) -> Callable:
@@ -16,5 +24,7 @@ def debugger_factory(show_args=True) -> Callable:
             results = func(*args, **kwargs)
             print(f"{func.__name__} ran for {dt.now() - t0}")
             return results
+
         return wrapper
+
     return debugger
