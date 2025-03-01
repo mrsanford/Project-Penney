@@ -46,23 +46,6 @@ def get_decks(
     return decks, seeds
 
 
-def latest_seed(filepath: str) -> int:
-    """
-    Loads the latest seed last used based on the most recently saved iterative file
-    If the file path isn't found, the default random seed is 42
-    ---
-    Arguments:
-    filepath (str): path to the folder containing the shuffled deck files (/data)
-    Returns:
-    int: the latest seed used and incremented by 1
-    """
-    files = sorted(Path(filepath).glob("shuffled_decks_*.npz"))
-    if not files:
-        return 42
-    data = np.load(files[-1])
-    return data["seeds"][-1] + 1
-
-
 def latest_deck(filepath: str) -> Path | None:
     """
     Finds the most recent shuffled deck file based on the filename pattern
@@ -125,9 +108,10 @@ def load_decks(filepath: str) -> np.ndarray:
     return np.load(latest_file)["decks"]
 
 
-def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+def find_tricks(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
     """
-    Counts the number of each tricks each player wins based on the combos
+    Scans the deck to find/count tricks for each player. After the trick is found,
+    the sequence gets cut and continues at the next card.
     ---
     Arguments:
     deck (np.ndarray): the shuffled deck of cards
@@ -135,46 +119,66 @@ def count_tricks(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
     P2_combo (np.ndarray): P2's combination
     Returns: tuple of the number of tricks won per player
     """
-    # print(f"Deck: {deck}")
     P1_tricks = P2_tricks = 0
     combo_length = len(P1_combo)
+    assert combo_length == 3
     i = 0
     while i <= len(deck) - combo_length:
-        triplet = deck[i : i + combo_length]
-        if np.array_equal(triplet, P1_combo):
-            P1_tricks += 1
-            i += combo_length
-        elif np.array_equal(triplet, P2_combo):
-            P2_tricks += 1
-            i += combo_length
+        if np.array_equal(P1_combo, P2_combo):
+            # P1 and P2 have the same sequence, P1 always wins these
+            if np.array_equal(deck[i : i + combo_length], P1_combo):
+                P1_tricks += 1
+                i += combo_length
+            else:
+                i += 1
         else:
-            i += 1
+            if np.array_equal(deck[i : i + combo_length], P1_combo):
+                P1_tricks += 1
+                i += combo_length
+            elif np.array_equal(deck[i : i + combo_length], P2_combo):
+                P2_tricks += 1
+                i += combo_length
+            else:
+                i += 1
     return P1_tricks, P2_tricks
 
 
-def count_cards(deck, P1_combo: np.ndarray, P2_combo: np.ndarray):
+def count_cards(deck: np.ndarray, P1_combo: np.ndarray, P2_combo: np.ndarray):
     """
-    Counts the total number of cards won per player
+    Counts total cards won per player (including unclaimed cards between tricks).
     ---
-    Arguments: same for count_tricks
-    Return: same for count_tricks
+    Arguments:
+        deck (np.ndarray): the shuffled deck of cards
+        P1_combo (np.ndarray): P1's combination
+        P2_combo (np.ndarray): P2's combination
+    Returns:
+        tuple: (P1_cards, P2_cards)
     """
-    P1_cards = P2_cards = 0
-    unwon_cards = 0
     combo_length = len(P1_combo)
+    windows = np.lib.stride_tricks.sliding_window_view(deck, combo_length)
+    P1_matches = np.all(windows == P1_combo, axis=1)
+    P2_matches = np.all(windows == P2_combo, axis=1)
+    P1_cards = P2_cards = 0
+    last_claimed_index = -1
     i = 0
-    while i <= len(deck) - combo_length:
-        triplet = deck[i : i + combo_length]
-        if np.array_equal(triplet, P1_combo):
-            P1_cards += combo_length + unwon_cards
-            unwon_cards = 0
+    while i < len(P1_matches):
+        if P1_matches[i]:
+            if i <= last_claimed_index:
+                i += 1
+                continue
+            won_cards = (i - last_claimed_index) + combo_length - 1
+            P1_cards += won_cards
+            last_claimed_index = i + combo_length - 1
             i += combo_length
-        elif np.array_equal(triplet, P2_combo):
-            P2_cards += combo_length + unwon_cards
-            unwon_cards = 0
+        elif P2_matches[i]:
+            if i <= last_claimed_index:
+                i += 1
+                continue
+            won_cards = (i - last_claimed_index) + combo_length - 1
+            P2_cards += won_cards
+            last_claimed_index = i + combo_length - 1
             i += combo_length
         else:
-            unwon_cards += 1
             i += 1
     return P1_cards, P2_cards
 
@@ -252,8 +256,10 @@ def score_game(results: np.ndarray):
         "P2_card_pct": P2_card_pct,
         "draw_pct": draw_pct,
     }
+    # also save this output in a dataframe called totals.csv with the iterative counts of all the updated results
 
 
+# score on tricks
 def plot_heatmaps(p1_trick_pct, p1_card_pct):
     """Plot heatmaps for Player 1 vs Player 2 win probabilities based on tricks and cards."""
     # Mask out invalid diagonal cells (same combo vs same combo)
