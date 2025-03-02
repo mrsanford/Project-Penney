@@ -1,6 +1,23 @@
+import numpy as np
 from typing import Callable
 from datetime import datetime as dt
 from pathlib import Path
+
+# there are 8 possible P1 combos
+R, B = 0, 1  # Red and Black
+P1_COMBOS = np.array(
+    [
+        (R, R, R),
+        (R, R, B),
+        (R, B, R),
+        (R, B, B),
+        (B, R, R),
+        (B, R, B),
+        (B, B, R),
+        (B, B, B),
+    ],
+    dtype=object,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
