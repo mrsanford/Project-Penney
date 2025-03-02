@@ -1,56 +1,39 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-from src.datagen import (
-    P1_COMBOS,
-    get_decks,
-    latest_seed,
-    latest_deck,
-    store_decks,
+from src.helpers import P1_COMBOS
+from src.helpers import DATA_DIR
+from src.datagen import get_decks, store_decks
+from src.processing import (
     load_decks,
-    count_tricks,
     count_cards,
+    find_tricks,
     simulate_combos,
-    score_game,
-    plot_heatmaps,
+    score_summarize,
 )
-# from src.helpers import PATH_INFO
+from src.visualization import plot_heatmaps
 
 
+# default testing
 def main():
-    # Generating shuffled decks and getting the seeds
+    # deck shuffling, seed generation, and storage
     decks, seeds = get_decks(n_decks=1000, seed=42)
-
-    # Storing the shuffled decks to a file
-    store_decks(decks, seeds, filepath="./data", append_file=True)
-
-    # Loading the latest deck from the stored files
-    loaded_decks = load_decks("./data")
-
-    # Running the trick count simulation
+    store_decks(decks, seeds, directory=DATA_DIR, append_file=True)
+    # loading data and simulating
+    loaded_decks = load_decks(DATA_DIR)
+    # running trick and card simulations
     sample_deck = loaded_decks[0]
-    P1_combo = P1_COMBOS[0]  # First combo for Player 1
+    P1_combo = P1_COMBOS[0]
     P2_combo = P1_COMBOS[1]
-    P1_tricks, P2_tricks = count_tricks(sample_deck, P1_combo, P2_combo)
-    # print(f"Player 1 tricks: {P1_tricks}, Player 2 tricks: {P2_tricks}")
-
-    # Running the card count simulation
+    P1_tricks, P2_tricks = find_tricks(sample_deck, P1_combo, P2_combo)
     P1_cards, P2_cards = count_cards(sample_deck, P1_combo, P2_combo)
-    # print(f"Player 1 cards: {P1_cards}, Player 2 cards: {P2_cards}")
-
-    # Simulating combos across multiple decks
     results = simulate_combos(
-        deck_file="./data", P1_combos=P1_COMBOS, P2_combos=P1_COMBOS
+        decks=sample_deck, P1_combos=P1_COMBOS, P2_combos=P1_COMBOS
     )
-    # Scoring the results of the game
-    score = score_game(results)
-    # print(f"Game Score: {score}")
-
-    # Visualizing the results for trick and card win percentages
-    p1_trick_pct = np.random.rand(len(P1_COMBOS), len(P1_COMBOS)) * 100
-    p1_card_pct = np.random.rand(len(P1_COMBOS), len(P1_COMBOS)) * 100
-    plot_heatmaps(p1_trick_pct, p1_card_pct)
+    # scoring the results
+    score = score_summarize(results)
+    # visualization
+    p2_trick_pct = np.random.rand(len(P1_COMBOS), len(P1_COMBOS)) * 100
+    p2_card_pct = np.random.rand(len(P1_COMBOS), len(P1_COMBOS)) * 100
+    plot_heatmaps(p2_card_pct, p2_trick_pct)
 
 
 if __name__ == "__main__":
