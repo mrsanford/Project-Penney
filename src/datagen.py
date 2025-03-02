@@ -1,19 +1,11 @@
 import numpy as np
 import os
-import glob
 import pandas as pd
 from pathlib import Path
+import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
-from src.helpers import (
-    BASE_DIR,
-    DATA_DIR,
-    RESULTS_DIR,
-    PLOTS_DIR,
-    LOGS_DIR,
-    LATEST_RESULTS_FILE,
-    LATEST_DECK_FILE_PATTERN,
-)
+from src.helpers import PLOTS_DIR
 
 HALF_DECK_SIZE = 5
 R, B = 0, 1  # Red and Black
@@ -64,7 +56,7 @@ def latest_deck_file(directory: str) -> Path:
     """
     files = sorted(Path(directory).glob("shuffled_decks_*.npz"))
     if not files:
-        raise FileNotFoundError(f"No shuffled deck files found in {directory}")
+        return None
     return files[-1]
 
 
@@ -84,8 +76,12 @@ def store_decks(
     """
     os.makedirs(directory, exist_ok=True)
     latest_file = latest_deck_file(directory)
-
-    if append_file and latest_file:
+    if latest_file is None:
+        new_file = os.path.join(directory, "shuffled_decks_1.npz")
+        np.savez_compressed(new_file, decks=decks, seeds=seeds)
+        print(f"Stored first deck file: {new_file}")
+        return
+    if append_file:
         data = np.load(latest_file)
         if "decks" in data.files and "seeds" in data.files:
             stored_decks = data["decks"]
@@ -97,12 +93,10 @@ def store_decks(
             decks = np.vstack((stored_decks, decks))
             seeds = np.concatenate((stored_seeds, new_seeds))
         np.savez_compressed(latest_file, decks=decks, seeds=seeds)
-        print(f"Appended decks to {latest_file}")
     else:
-        new_index = len(list(Path(directory).glob("shuffled_decks_*.npz"))) + 1
-        new_file = os.path.join(directory, f"shuffled_decks_{new_index}.npz")
+        latest_number = int(latest_file.stem.split("_")[-1])
+        new_file = os.path.join(directory, f"shuffled_decks_{latest_number + 1}.npz")
         np.savez_compressed(new_file, decks=decks, seeds=seeds)
-        print(f"Stored new deck file: {new_file}")
 
 
 def load_decks(directory: str = "./data") -> np.ndarray:
@@ -202,6 +196,7 @@ def count_cards(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> tuple[int
     return P1_cards, P2_cards
 
 
+# check the path constants here
 def simulate_combos(
     decks: np.ndarray, P1_combos: tuple, P2_combos: tuple
 ) -> pd.DataFrame:
@@ -250,6 +245,7 @@ def simulate_combos(
     return df
 
 
+# update the Path with constant here
 def score_summarize(results_file: str | Path = Path("./results/testing.csv")):
     """
     Reads the game results from a CSV file, computes trick and card win percentages,
@@ -263,7 +259,6 @@ def score_summarize(results_file: str | Path = Path("./results/testing.csv")):
     COMBO_STRINGS = [combo_to_str(combo) for combo in P1_COMBOS]
     p2_trick_pct = np.zeros((8, 8), dtype=float)
     p2_card_pct = np.zeros((8, 8), dtype=float)
-
     for i, p1_combo_str in enumerate(COMBO_STRINGS):
         for j, p2_combo_str in enumerate(COMBO_STRINGS):
             if p1_combo_str == p2_combo_str:
@@ -286,12 +281,16 @@ def score_summarize(results_file: str | Path = Path("./results/testing.csv")):
     return p2_trick_pct, p2_card_pct
 
 
-def plot_heatmaps(p2_trick_pct, p2_card_pct):
+def plot_heatmaps(p2_trick_pct, p2_card_pct, save: bool = True, show: bool = False):
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
     mask = np.eye(len(P1_COMBOS), dtype=bool)
     cmap = sns.color_palette("coolwarm", as_cmap=True)
     cmap = cmap.with_extremes(bad="lightgrey")
     labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in P1_COMBOS]
+
     fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=100)
+
     heatmap_kws = {
         "annot": True,
         "fmt": ".1f",
@@ -313,4 +312,12 @@ def plot_heatmaps(p2_trick_pct, p2_card_pct):
     axes[1].set_xlabel("Player 1 Combination")
     axes[1].set_ylabel("Player 2 Combination")
     plt.tight_layout()
-    plt.show()
+    if save:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        plot_path = PLOTS_DIR / f"heatmap_{timestamp}.png"
+        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+        print(f"Saved heatmap to: {plot_path}")
+    if show:
+        plt.show()
+    else:
+        plt.close()
