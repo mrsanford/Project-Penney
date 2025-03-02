@@ -15,20 +15,24 @@ This version of Project Penney is a 3-bit implementation. The game works where P
 ## **Quick Start Guide**
 Beginning with this repository will require you cloning  and installing the dependencies. Note: this project has been managed with uv, and more information regarding uv setup and management can be found [here](https://docs.astral.sh/uv/getting-started/installation/). To simply view the project, clone the repository and run the script out of main.py. An alternative set up is below:
 
+### Access the Directories and Constants
+```
+from src.helpers import P1_COMBOS, R, C, DATA_DIR, LATEST_RESULTS_FILE
+```
 ### Generate the Shuffled Decks
 ```
 from src.datagen import get_decks, store_decks
 decks, seeds = get_decks(n_decks=1000,seed=42)
 store_decks(decks, seeds, directory=DATA_DIR, append_file=False)
 ```
-### Run the Simulation
+### Run the Simulation and Score
 ```
-from src.datagen import simulate_combos, P1_COMBOS
+from src.processing import load_decks, simulate_combos,score_summarize
 results = simulate_combos(decks,P1_COMBOS,P1_COMBOS)
+score = score_summarize(results_file=LATEST_RESULTS_FILE)
 ```
 ### Visualize Outputs
 ```
-from src.datagen import score_summarize, plot_heatmaps
-score = score_game(resules_file=LATEST_RESULTS_FILE)
+from src.visualization import plot_heatmaps
 plot_heatmaps(p2_trick_pct, p2_card_pct, save=True, show=True)
 ```
