@@ -18,18 +18,17 @@ Beginning with this repository will require you cloning  and installing the depe
 ### Generate the Shuffled Decks
 ```
 from src.datagen import get_decks, store_decks
-decks, seeds = get_decks(n_decks=1000)
-store_decks(decks, seeds, filepath='./data')
+decks, seeds = get_decks(n_decks=1000,seed=42)
+store_decks(decks, seeds, directory=DATA_DIR, append_file=False)
 ```
 ### Run the Simulation
 ```
 from src.datagen import simulate_combos, P1_COMBOS
-deck_file='./data'
-results = simulate_combos(deck_file,P1_COMBOS,P2_COMBOS=P1_COMBOS)
+results = simulate_combos(decks,P1_COMBOS,P1_COMBOS)
 ```
 ### Visualize Outputs
 ```
-from src.datagen import score_game, plot_heatmaps
-score = score_game(results)
-plot_heatmaps(score['P1_trick_pct'], score['P1_card_pct'])
+from src.datagen import score_summarize, plot_heatmaps
+score = score_game(resules_file=LATEST_RESULTS_FILE)
+plot_heatmaps(p2_trick_pct, p2_card_pct, save=True, show=True)
 ```
