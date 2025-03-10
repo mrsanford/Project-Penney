@@ -2,11 +2,11 @@
 
 This version of Project Penney is a 3-bit implementation. The game works where two players compete by choosing three-bit sequences consisting of binary values (RED = 0 or BLACK = 1). The project is a simulation designed to visualize and analyze player combination outcomes. There will be randomly generated sequence, and the first player whose chosen sequence appears in order in the generated sequence wins.
 
-##### There are two ways in which points are scored: 
+#### There are two ways in which points are scored: 
 - Tricks: a trick is won when a player's three-card sequence appears in the shuffled deck of cards. Tricks only have a value of +1 every time, so a sequence appearance will always only be worth +1 trick.
 - Cards: cards are also won when a player's sequence appears in the simulated deck. A number of won cards will always be a minimum of three (equalling the player's sequence). Winning cards are counted from the last card of the previous trick + 1 to the end of the player's matching trick.
 
-##### Game Considerations:
+#### Game Considerations:
 Since Player 1 commits to a sequence first, Player 2 has a strategic advantage in selecting their combination where they can minimize loss, maximize chances of winning, or to increase the likeliness of a draw. This advantage is represented in the combination formula:
 - If P1's combination is [1,2,1]
 - P2's formula would be [-2, 1, 2]
