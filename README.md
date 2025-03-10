@@ -3,7 +3,7 @@
 This version of Project Penney is a 3-bit implementation where two players comete by selecting three-bit card sequences (legnth of 3 cards), consisting of binary values:
 - RED = 0
 - BLACK = 1
-This program is designed to simulate n Penney games in order to analyze and visualize player combination probabilities. There will is a randomly generated, shuffled deck of cards; additionally, the player whose chosen sequence appears first in the simulated sequence will win the play. The number of plays will continue until the shuffled deck is fully used. #### **There are two ways in which points are scored**:
+This program is designed to simulate n Penney games in order to analyze and visualize player combination probabilities. There will is a randomly generated, shuffled deck of cards; additionally, the player whose chosen sequence appears first in the simulated sequence will win the play. The number of plays will continue until the shuffled deck is fully used. **There are two ways in which points are scored**:
 Tricks: A trick is won when a player's three-bit card sequence appears in the shuffled deck.
 - Each trick is always worth +1 'point' regardless of how many times a sequence appears.
 Cards: Cards are won when a player's sequence appears in the generated sequence (wins a trick). Cards will always be won when a trick is won.
