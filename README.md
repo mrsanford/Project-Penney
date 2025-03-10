@@ -1,13 +1,17 @@
 # **Project Penney Overview**
 
-This version of Project Penney is a 3-bit implementation. The game works where two players compete by choosing three-bit sequences consisting of binary values (RED = 0 or BLACK = 1). The project is a simulation designed to visualize and analyze player combination outcomes. There will be randomly generated sequence, and the first player whose chosen sequence appears in order in the generated sequence wins.
-
-#### There are two ways in which points are scored: 
-- Tricks: a trick is won when a player's three-card sequence appears in the shuffled deck of cards. Tricks only have a value of +1 every time, so a sequence appearance will always only be worth +1 trick.
-- Cards: cards are also won when a player's sequence appears in the simulated deck. A number of won cards will always be a minimum of three (equalling the player's sequence). Winning cards are counted from the last card of the previous trick + 1 to the end of the player's matching trick.
+This version of Project Penney is a 3-bit implementation where two players comete by selecting three-bit card sequences (legnth of 3 cards), consisting of binary values:
+- RED = 0
+- BLACK = 1
+This program is designed to simulate n Penney games in order to analyze and visualize player combination probabilities. There will is a randomly generated, shuffled deck of cards; additionally, the player whose chosen sequence appears first in the simulated sequence will win the play. The number of plays will continue until the shuffled deck is fully used. #### **There are two ways in which points are scored**:
+Tricks: A trick is won when a player's three-bit card sequence appears in the shuffled deck.
+- Each trick is always worth +1 'point' regardless of how many times a sequence appears.
+Cards: Cards are won when a player's sequence appears in the generated sequence (wins a trick). Cards will always be won when a trick is won.
+- The minimum number of won cards is three (equivalent to the length of the combination).
+- The count of won cards extends from the last card of the previous trick plus one to the end of the new matching trick (inclusive).
 
 #### Game Considerations:
-Since Player 1 commits to a sequence first, Player 2 has a strategic advantage in selecting their combination where they can minimize loss, maximize chances of winning, or to increase the likeliness of a draw. This advantage is represented in the combination formula:
+Since Player 1 (P1) commits to a sequence first, Player 2 (P2) has a strategic advantage in selecting their combination. P2 will aim to minimize loss, maximize chances of winning, or increase the probability of a draw. This advantage is represented in the combination formula:
 - If P1's combination is [1,2,1]
 - P2's formula would be [-2, 1, 2]
 
