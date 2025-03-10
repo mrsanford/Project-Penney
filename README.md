@@ -24,6 +24,19 @@ Since Player 1 (P1) commits to a sequence first, Player 2 (P2) has a strategic a
 
 #### Disclaimer: this project is not a game rather it is a simulation and visualization tool to aid in optimizing 3-bit Penney's games. 
 
+### File Organization
+- /src - contains the Project Penney source code
+    - datagen.py
+    - helpers.py
+    - processing.py
+    - visualization.py
+- /data - stores the shuffled decks and seeds for loading and processing
+    - to_load/ - contains the decks waiting to be loaded
+    - loaded/ - contains decks that have been processed
+- /logging
+- /plots - stores the heatmpa visualizations of game probabilty outcomes, scored on tricks and cards
+- /results - contains the master .csv file with the total counts of game stats including chosen combinations, P1 and P2 wins, losses, and draws by cards and tricks
+
 --- 
 
 ## **Quick Start Guide**
