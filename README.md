@@ -1,6 +1,20 @@
 # **Project Penney Overview**
 
-This version of Project Penney is a 3-bit implementation. The game works where Player 1 (P1) selects a three card length combination of red and black cards, represented as RED = 0 or BLACK = 1. The project is a simulation designed to visualize and analyze combination outcomes in order to (1) help Player 2 (P2) to exploit the advantage of picking second through minimizing loss, maximizing wins, or increasing the chances of a draw. 
+This version of Project Penney is a 3-bit implementation where two players comete by selecting three-bit card sequences (legnth of 3 cards), consisting of binary values:
+- RED = 0
+- BLACK = 1
+
+This program is designed to simulate n Penney games in order to analyze and visualize player combination probabilities. There will is a randomly generated, shuffled deck of cards; additionally, the player whose chosen sequence appears first in the simulated sequence will win the play. The number of plays will continue until the shuffled deck is fully used. **There are two ways in which points are scored**:
+- **Tricks**: A trick is won when a player's three-bit card sequence appears in the shuffled deck.
+    - Each trick is always worth +1 'point' regardless of how many times a sequence appears.
+- **Cards**: Cards are won when a player's sequence appears in the generated sequence (wins a trick). Cards will always be won when a trick is won.
+    - The minimum number of won cards is three (equivalent to the length of the combination).
+    - The count of won cards extends from the last card of the previous trick plus one to the end of the new matching trick (inclusive).
+
+#### Game Considerations:
+Since Player 1 (P1) commits to a sequence first, Player 2 (P2) has a strategic advantage in selecting their combination. P2 will aim to minimize loss, maximize chances of winning, or increase the probability of a draw. This advantage is represented in the combination formula:
+- If P1's combination is [1,2,1]
+- P2's formula would be [-2, 1, 2]
 
 ### Features
 - Deck shuffling and storing: the simulation has generated a set of easily reproducible and accessible seeds, which are used to shuffle the decks. The shuffled decks have been stored in .npz files in the [/data](https://github.com/mrsanford/Project-Penney/tree/main/data) folder. Considerations have been taking to allow for new decks to be either appended to existing ones, or for newly shuffled decks to be inputted into brand new files.
@@ -9,6 +23,19 @@ This version of Project Penney is a 3-bit implementation. The game works where P
 - Visualizing: a master dataframe is outputted of all simulation results and heatmaps are generated of players' trick and card win percentages.
 
 #### Disclaimer: this project is not a game rather it is a simulation and visualization tool to aid in optimizing 3-bit Penney's games. 
+
+## File Organization
+- #### /src - contains the Project Penney source code
+    - datagen.py
+    - helpers.py
+    - processing.py
+    - visualization.py
+- #### /data - stores the shuffled decks and seeds for loading and processing
+    - to_load/ - contains the decks waiting to be loaded
+    - loaded/ - contains decks that have been processed
+- #### /logging
+- #### /plots - stores the heatmpa visualizations of game probabilty outcomes, scored on tricks and cards
+- #### /results - contains the master .csv file with the total counts of game stats including chosen combinations, P1 and P2 wins, losses, and draws by cards and tricks
 
 --- 
 
