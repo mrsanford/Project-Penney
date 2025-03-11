@@ -9,7 +9,7 @@ HALF_DECK_SIZE = 5
 def get_decks(
     n_decks: int = 1000, seed: int = 42, half_deck_size: int = HALF_DECK_SIZE
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Efficiently generate `n_decks` shuffled decks using NumPy.
+    """Efficiently generates `n_decks` shuffled decks using NumPy.
     ---
     Arguments:
     n_decks (int): number of shuffled decks to generate, default is 1000
