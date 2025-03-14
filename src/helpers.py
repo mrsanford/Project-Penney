@@ -3,9 +3,10 @@ from typing import Callable
 from datetime import datetime as dt
 from pathlib import Path
 
-# there are 8 possible P1 combos
 R, B = 0, 1  # Red and Black
-P1_COMBOS = np.array(
+HALF_DECK_SIZE = 5  # this can be changed
+# there are 8 possible P1 combos
+ALL_COMBOS = np.array(
     [
         (R, R, R),
         (R, R, B),
@@ -19,14 +20,20 @@ P1_COMBOS = np.array(
     dtype=object,
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-RESULTS_DIR = BASE_DIR / "results"
-PLOTS_DIR = BASE_DIR / "plots"
-LOGS_DIR = BASE_DIR / "logs"
+# Defining the directories
+DATA_DIR = Path("data")
+TO_LOAD_DIR = DATA_DIR / "to_load"
+LOADED_DIR = DATA_DIR / "loaded"
+PLOTS_DIR = Path("plots")
+LOGS_DIR = Path("logs")
 
-LATEST_RESULTS_FILE = RESULTS_DIR / "testing.csv"
-LATEST_DECK_FILE_PATTERN = DATA_DIR / "shuffled_decks_*.npz"
+# Ensuring the directories exist
+for directory in [DATA_DIR, TO_LOAD_DIR, LOADED_DIR, PLOTS_DIR, LOGS_DIR]:
+    directory.mkdir(parents=True, exist_ok=True)
+
+# Defining the file paths
+TOTAL_COUNTS_FILE = DATA_DIR / "total_counts.csv"
+LATEST_TO_LOAD_FILE = TO_LOAD_DIR / "raw_shuffled_decks_*.npz"
 
 
 def debugger_factory(show_args=True) -> Callable:

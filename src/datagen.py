@@ -1,9 +1,7 @@
 import numpy as np
 import os
 from pathlib import Path
-from src.helpers import R, B
-
-HALF_DECK_SIZE = 5
+from src.helpers import R, B, HALF_DECK_SIZE, TO_LOAD_DIR
 
 
 def get_decks(
@@ -27,23 +25,21 @@ def get_decks(
     return decks, seeds
 
 
-def latest_deck_file(directory: str) -> Path:
+def latest_deck_file(directory: str) -> Path | None:
     """
     Finds the most recent shuffled deck file based on the filename pattern in a given directory
     ---
     Arguments: directory (str): path to folder where the deck files are located
     Returns: either the most recent deck file or not returning anything if the files aren't found
     """
-    files = sorted(Path(directory).glob("shuffled_decks_*.npz"))
-    if not files:
-        return None
-    return files[-1]
+    files = sorted(Path(directory).glob("raw_shuffled_decks_*.npz"))
+    return files[-1] if files else None
 
 
 def store_decks(
     decks: np.ndarray,
     seeds: np.ndarray,
-    directory: str = "./data",
+    directory: str = TO_LOAD_DIR,
     append_file: bool = True,
 ) -> None:
     """Stores shuffled decks and respective seeds in the .npz file
@@ -57,7 +53,7 @@ def store_decks(
     os.makedirs(directory, exist_ok=True)
     latest_file = latest_deck_file(directory)
     if latest_file is None:
-        new_file = os.path.join(directory, "shuffled_decks_1.npz")
+        new_file = os.path.join(directory, "raw_shuffled_decks_1.npz")
         np.savez_compressed(new_file, decks=decks, seeds=seeds)
         print(f"Stored first deck file: {new_file}")
         return
@@ -75,5 +71,7 @@ def store_decks(
         np.savez_compressed(latest_file, decks=decks, seeds=seeds)
     else:
         latest_number = int(latest_file.stem.split("_")[-1])
-        new_file = os.path.join(directory, f"shuffled_decks_{latest_number + 1}.npz")
+        new_file = os.path.join(
+            directory, f"raw_shuffled_decks_{latest_number + 1}.npz"
+        )
         np.savez_compressed(new_file, decks=decks, seeds=seeds)

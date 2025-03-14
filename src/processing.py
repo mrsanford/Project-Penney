@@ -1,188 +1,109 @@
 import numpy as np
 import pandas as pd
 import os
-from pathlib import Path
 from src.datagen import latest_deck_file
-from src.helpers import P1_COMBOS, R, B
+from src.helpers import R, ALL_COMBOS, TO_LOAD_DIR, LOADED_DIR, TOTAL_COUNTS_FILE
 
 
-def load_decks(directory: str = "./data") -> np.ndarray:
-    """Dynamically loads the most recent deck file dynamically
-    ---
-    Arguments: directory (str)
-    Returns: np.ndarray of loaded decks from the most recent '.npz' file
-    Raises: FileNotFoundError: if no shuffled deck files are found
+def load_decks() -> np.ndarray:
     """
-    latest_file = latest_deck_file(directory)
+    Loads the most recent shuffled deck file from 'to_load' to 'loaded'
+    """
+    latest_file = latest_deck_file(TO_LOAD_DIR)
     if latest_file is None:
         raise FileNotFoundError("No shuffled decks found.")
     data = np.load(latest_file)
-    return data["decks"]
+    decks = data["decks"]
+    if decks.ndim == 1:
+        decks = decks.reshape(1, -1)
+    new_name = latest_file.name.replace("raw", "processed")
+    new_location = LOADED_DIR / new_name
+    os.rename(latest_file, new_location)
+    print(f"Move and renamed {latest_file} to {new_location}")
+    return decks
 
 
 def combo_to_str(combo: tuple[int, int, int]) -> str:
+    """
+    Converts the numerical card combination into a string representation.
+    ---
+    Arguments:
+        combo (tuple[int, int, int]): a tuple representing a card sequence
+    Returns:
+        str: a string where 'R' represents 0 values and 'B' represents 1 values
+    """
     return "".join("R" if x == R else "B" for x in combo)
 
 
-def combo_from_str(combo_str: str) -> tuple[int, int, int]:
-    return tuple(R if ch == "R" else B for ch in combo_str)
-
-
-def find_tricks(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> tuple[int, int]:
+def find_sequences(
+    deck: np.ndarray, P1_combo: tuple, P2_combo: tuple
+) -> tuple[int, int]:
     """
-    Scans the deck to find/count tricks for each player. After the trick is found,
-    the sequence gets cut and continues at the next card.
-    ---
-    Arguments:
-    deck (np.ndarray): the shuffled deck of cards
-    P1_combo (np.ndarray): P1's combination
-    P2_combo (np.ndarray): P2's combination
-    Returns: tuple of the number of tricks won per player
-    """
-    P1_tricks = P2_tricks = 0
-    combo_length = len(P1_combo)
-    assert combo_length == 3
-    i = 0
-    while i <= len(deck) - combo_length:
-        if np.array_equal(P1_combo, P2_combo):
-            # P1 and P2 have the same sequence, P1 always wins these
-            if np.array_equal(deck[i : i + combo_length], P1_combo):
-                P1_tricks += 1
-                i += combo_length
-            else:
-                i += 1
-        else:
-            if np.array_equal(deck[i : i + combo_length], P1_combo):
-                P1_tricks += 1
-                i += combo_length
-            elif np.array_equal(deck[i : i + combo_length], P2_combo):
-                P2_tricks += 1
-                i += combo_length
-            else:
-                i += 1
-    return P1_tricks, P2_tricks
-
-
-def count_cards(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> tuple[int, int]:
-    """
-    Counts total cards won per player (including unclaimed cards between tricks).
+    Identifies and scores sequences for both players.
     ---
     Arguments:
         deck (np.ndarray): the shuffled deck of cards
         P1_combo (np.ndarray): P1's combination
         P2_combo (np.ndarray): P2's combination
-    Returns:
-        tuple: (P1_cards, P2_cards)
+    Returns: tuple of the number of tricks and cards won per player
     """
-    combo_length = len(P1_combo)
-    windows = np.lib.stride_tricks.sliding_window_view(deck, combo_length)
-    P1_matches = np.all(windows == P1_combo, axis=1)
-    P2_matches = np.all(windows == P2_combo, axis=1)
     P1_cards = P2_cards = 0
-    last_claimed_index = -1
+    P1_tricks = P2_tricks = 0
+    combo_length = len(P1_combo)
     i = 0
-    while i < len(P1_matches):
-        if P1_matches[i]:
-            if i <= last_claimed_index:
-                i += 1
-                continue
-            won_cards = (i - last_claimed_index) + combo_length - 1
-            P1_cards += won_cards
-            last_claimed_index = i + combo_length - 1
+    while i <= deck.size - combo_length:
+        if np.array_equal(deck[i : i + combo_length], P1_combo):
+            P1_cards += combo_length
+            P1_tricks += 1
             i += combo_length
-        elif P2_matches[i]:
-            if i <= last_claimed_index:
-                i += 1
-                continue
-            won_cards = (i - last_claimed_index) + combo_length - 1
-            P2_cards += won_cards
-            last_claimed_index = i + combo_length - 1
+        elif np.array_equal(deck[i : i + combo_length], P2_combo):
+            P2_cards += combo_length
+            P2_tricks += 1
             i += combo_length
         else:
             i += 1
-    return P1_cards, P2_cards
+    return P1_cards, P2_cards, P1_tricks, P2_tricks
 
 
-# check the path constants here
-def simulate_combos(
-    decks: np.ndarray, P1_combos: tuple, P2_combos: tuple
-) -> pd.DataFrame:
-    """
-    Simulate the game for all combinations and all available shuffled decks
+def score_game(deck: np.ndarray, P1_combo: tuple, P2_combo: tuple) -> dict:
+    """Scores a single game
     ---
     Arguments:
-    deck_file (str): path to the file of shuffled decks
-    P1_combos (np.ndarray): P1's possible combinations in an array
-    P2_combos (np.ndarray): P2's possible combinations in an array
-    Return:
-    np.ndarray: A 2D array of shape (n_combinations * n_decks, 7) containing the results for each combination
-    (deck_id, P1_combo, P2_combo, P1_tricks, P2_tricks, P1_cards, P2_cards).
+        Intakes the same arguments as find_sequences()
+    Returns:
+        dict: a dictionary containing the P1 and P2 combos, scores, and tricks
     """
-    decks = load_decks(directory="./data")
+    P1_cards, P2_cards, P1_tricks, P2_tricks = find_sequences(deck, P1_combo, P2_combo)
+    return {
+        "P1_combo": P1_combo,
+        "P2_combo": P2_combo,
+        "P1_score": P1_cards,
+        "P2_score": P2_cards,
+        "P1_tricks": P1_tricks,
+        "P2_tricks": P2_tricks,
+        "card_ties": int(P1_cards == P2_cards),
+        "trick_ties": int(P1_tricks == P2_tricks),
+    }
+
+
+def simulate_games(
+    decks: np.ndarray, P1_combos: tuple = ALL_COMBOS, P2_combos: tuple = ALL_COMBOS
+) -> pd.DataFrame:
+    """Simulates multiple games and stores results."""
     results = []
     for deck_id, deck in enumerate(decks):
         for P1_combo in P1_combos:
             for P2_combo in P2_combos:
                 if np.array_equal(P1_combo, P2_combo):
                     continue
-                P1_tricks, P2_tricks = find_tricks(deck, P1_combo, P2_combo)
-                P1_cards, P2_cards = count_cards(deck, P1_combo, P2_combo)
-                trick_tie = 1 if P1_tricks == P2_tricks else 0
-                card_tie = 1 if P1_cards == P2_cards else 0
-                results.append(
-                    {
-                        "deck_id": deck_id,
-                        "P1_combo": combo_to_str(P1_combo),
-                        "P2_combo": combo_to_str(P2_combo),
-                        "P1_tricks": P1_tricks,
-                        "P2_tricks": P2_tricks,
-                        "trick_tie": trick_tie,
-                        "P1_cards": P1_cards,
-                        "P2_cards": P2_cards,
-                        "card_tie": card_tie,
-                    }
-                )
-    df = pd.DataFrame(results)
-    os.makedirs("./results", exist_ok=True)
-    output_file = "./results/testing.csv"
-    if os.path.exists(output_file):
-        df.to_csv(output_file, mode="a", header=False, index=False)
-    else:
-        df.to_csv(output_file, index=False)
-    return df
-
-
-# update the path with constant here
-def score_summarize(results_file: str | Path = Path("./results/testing.csv")):
-    """
-    Reads the game results from a CSV file, computes trick and card win percentages,
-    and writes/updates the summary CSV with those statistics. The outputs are used for the heatmaps.
-    ---
-    Arguments:
-    results_file (str): Path to the raw game results CSV.
-    summary_file (str): Path to the summary file to append results.
-    """
-    results_df = pd.read_csv(results_file)
-    COMBO_STRINGS = [combo_to_str(combo) for combo in P1_COMBOS]
-    p2_trick_pct = np.zeros((8, 8), dtype=float)
-    p2_card_pct = np.zeros((8, 8), dtype=float)
-    for i, p1_combo_str in enumerate(COMBO_STRINGS):
-        for j, p2_combo_str in enumerate(COMBO_STRINGS):
-            if p1_combo_str == p2_combo_str:
-                p2_trick_pct[j, i] = np.nan
-                p2_card_pct[j, i] = np.nan
-                continue
-            matchup = results_df[
-                (results_df["P1_combo"] == p1_combo_str)
-                & (results_df["P2_combo"] == p2_combo_str)
-            ]
-            if len(matchup) == 0:
-                p2_trick_pct[j, i] = np.nan
-                p2_card_pct[j, i] = np.nan
-                continue
-            p2_trick_wins = np.sum(matchup["P2_tricks"] > matchup["P1_tricks"])
-            p2_card_wins = np.sum(matchup["P2_cards"] > matchup["P1_cards"])
-
-            p2_trick_pct[j, i] = (p2_trick_wins / len(matchup)) * 100
-            p2_card_pct[j, i] = (p2_card_wins / len(matchup)) * 100
-    return p2_trick_pct, p2_card_pct
+                game_result = score_game(deck, P1_combo, P2_combo)
+                game_result["deck_id"] = deck_id
+                results.append(game_result)
+    total_count_df = pd.DataFrame(results)
+    total_count_df.to_csv(
+        TOTAL_COUNTS_FILE,
+        mode="a",
+        header=not os.path.exists(TOTAL_COUNTS_FILE),
+        index=False,
+    )
+    return total_count_df

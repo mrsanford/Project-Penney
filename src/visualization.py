@@ -2,17 +2,16 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import datetime
-from src.helpers import P1_COMBOS, R
-from src.helpers import PLOTS_DIR
+from src.helpers import ALL_COMBOS, R, PLOTS_DIR
 
 
-def plot_heatmaps(p2_trick_pct, p2_card_pct, save: bool = True, show: bool = False):
+def plot_heatmaps(trick_win_prob, card_win_prob, save: bool = True, show: bool = False):
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    mask = np.eye(len(P1_COMBOS), dtype=bool)
+    mask = np.eye(len(ALL_COMBOS), dtype=bool)
     cmap = sns.color_palette("coolwarm", as_cmap=True)
     cmap = cmap.with_extremes(bad="lightgrey")
-    labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in P1_COMBOS]
+    labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in ALL_COMBOS]
 
     fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=100)
 
@@ -27,15 +26,17 @@ def plot_heatmaps(p2_trick_pct, p2_card_pct, save: bool = True, show: bool = Fal
         "cmap": cmap,
         "mask": mask,
     }
-    sns.heatmap(p2_trick_pct, ax=axes[0], **heatmap_kws)
+
+    sns.heatmap(trick_win_prob, ax=axes[0], **heatmap_kws)
     axes[0].set_title("P2 Trick Win Probability (%)")
     axes[0].set_xlabel("Player 1 Combination")
     axes[0].set_ylabel("Player 2 Combination")
 
-    sns.heatmap(p2_card_pct, ax=axes[1], **heatmap_kws)
+    sns.heatmap(card_win_prob, ax=axes[1], **heatmap_kws)
     axes[1].set_title("P2 Card Win Probability (%)")
     axes[1].set_xlabel("Player 1 Combination")
     axes[1].set_ylabel("Player 2 Combination")
+
     plt.tight_layout()
     if save:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
