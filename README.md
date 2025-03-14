@@ -44,7 +44,7 @@ Beginning with this repository will require you cloning  and installing the depe
 
 ### Access the Directories and Constants
 ```
-from src.helpers import P1_COMBOS, R, C, DATA_DIR, LATEST_RESULTS_FILE
+from src.helpers import ALL_COMBOS, R, C, DATA_DIR, LATEST_RESULTS_FILE
 ```
 ### Generate the Shuffled Decks
 ```
@@ -55,7 +55,7 @@ store_decks(decks, seeds, directory=DATA_DIR, append_file=False)
 ### Run the Simulation and Score
 ```
 from src.processing import load_decks, simulate_combos,score_summarize
-results = simulate_combos(decks,P1_COMBOS,P1_COMBOS)
+results = simulate_combos(decks,ALL_COMBOS,ALL_COMBOS)
 score = score_summarize(results_file=LATEST_RESULTS_FILE)
 ```
 ### Visualize Outputs
