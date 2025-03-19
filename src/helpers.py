@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from pathlib import Path
 
 R, B = 0, 1  # Red and Black
-HALF_DECK_SIZE = 5  # this can be changed
+HALF_DECK_SIZE = 26  # this can be changed
 # there are 8 possible P1 combos
 ALL_COMBOS = np.array(
     [
@@ -22,8 +22,8 @@ ALL_COMBOS = np.array(
 
 # Defining the directories
 DATA_DIR = Path("data")
-TO_LOAD_DIR = DATA_DIR / "to_load"
-LOADED_DIR = DATA_DIR / "loaded"
+TO_LOAD_DIR = Path(DATA_DIR / "to_load")
+LOADED_DIR = Path(DATA_DIR / "loaded")
 PLOTS_DIR = Path("plots")
 LOGS_DIR = Path("logs")
 
@@ -36,6 +36,7 @@ TOTAL_COUNTS_FILE = DATA_DIR / "total_counts.csv"
 LATEST_TO_LOAD_FILE = TO_LOAD_DIR / "raw_shuffled_decks_*.npz"
 
 
+# Debugger Decorator
 def debugger_factory(show_args=True) -> Callable:
     def debugger(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
