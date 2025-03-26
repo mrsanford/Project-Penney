@@ -44,30 +44,28 @@ def store_decks(
     append_decks: bool = True,
 ) -> None:
     """
-    Stores shuffled decks with a datetime-based naming convention.
+    Stores shuffled decks with a datetime-based naming convention
     ---
     Args:
-        decks (np.ndarray): 2D array of shuffled decks to store.
-        seeds (np.ndarray): Array of seeds associated with the decks.
-        directory (str): Target directory to store the files.
-        append_decks (bool): If True, appends to latest file; otherwise, creates a new file.
+        decks (np.ndarray): 2D array of shuffled decks to store
+        seeds (np.ndarray): Array of seeds associated with the decks
+        directory (str): Target directory to store the files
+        append_decks (bool): If True, appends to latest file; otherwise, creates a new file
     """
     directory.mkdir(parents=True, exist_ok=True)
-    decks_str = np.array(
-        ["".join(map(str, deck)) for deck in decks]
-    )  # converts decks to string format
+    # converts decks to string format
+    decks_str = np.array(["".join(map(str, deck)) for deck in decks])
     if append_decks:
-        # Find the latest deck file in the directory
+        # finds latest deck file in the directory
         latest_file = latest_deck_file(directory)
-        if latest_file is None:  # If no previous files exist, create the first file
+        if latest_file is None:  # if previous files is None, creates first file
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             new_file = directory / f"raw_decks_{timestamp}.npz"
             np.savez_compressed(new_file, decks=decks, decks_str=decks_str, seeds=seeds)
             print(f"Stored first deck file: {new_file}")
             return
-        # If latest file exists, load it
-        data = np.load(latest_file)
-        # Check if decks and seeds exist in the loaded file
+        data = np.load(latest_file)  # loads latest file if it exists
+        # checks if if decks and seeds exist in to_load file
         if "decks" in data.files and "seeds" in data.files:
             stored_decks = data["decks"].copy()
             stored_seeds = data["seeds"].copy()
@@ -77,24 +75,15 @@ def store_decks(
             new_seeds = np.arange(
                 latest_used_seed + 1, latest_used_seed + 1 + len(decks)
             )
-
-            # Append new decks
+            # append new decks
             decks = np.vstack((stored_decks, decks))
             decks_str = np.concatenate((stored_decks_str, decks_str))
             seeds = np.concatenate((stored_seeds, new_seeds))
-
-            # Save updated file
             np.savez_compressed(
                 latest_file, decks=decks, decks_str=decks_str, seeds=seeds
             )
             print(f"Updated existing deck file: {latest_file}")
-        else:
-            # If no valid decks/seeds found in the file, create a new one
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_file = directory / f"raw_decks_{timestamp}.npz"
-            np.savez_compressed(new_file, decks=decks, decks_str=decks_str, seeds=seeds)
-            print(f"Stored new deck file: {new_file}")
-    else:  # If not appending, create a new file with timestamp
+            return
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         new_file = directory / f"raw_decks_{timestamp}.npz"
         np.savez_compressed(new_file, decks=decks, decks_str=decks_str, seeds=seeds)

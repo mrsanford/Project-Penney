@@ -1,49 +1,53 @@
-import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
-import datetime
-from src.helpers import ALL_COMBOS, R, PLOTS_DIR
+import pandas as pd
+from src.helpers import ALL_COMBOS, PLOTS_DIR
 
 
-def plot_heatmaps(trick_win_prob, card_win_prob, save: bool = True, show: bool = False):
-    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+def plot_heatmaps(trick_matrix: pd.DataFrame, card_matrix: pd.DataFrame, n_decks: int):
+    """
+    Creates heatmaps for visualizing the probability results for tricks and cards
+    ---
+    Args:
+        trick_array (np.ndarray): 8x8 array with probabilities of P2 winning tricks.
+        card_array (np.ndarray): 8x8 array with probabilities of P2 winning cards.
+        n_decks (int): Number of decks used for generating probabilities.
+    Returns: None
+    """
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)  # checking output directory exists
 
-    mask = np.eye(len(ALL_COMBOS), dtype=bool)
-    cmap = sns.color_palette("coolwarm", as_cmap=True)
-    cmap = cmap.with_extremes(bad="lightgrey")
-    labels = ["".join(["R" if x == R else "B" for x in combo]) for combo in ALL_COMBOS]
+    # plotting trick heatmap
+    trick_title = f"Probability of Player Winning \n on Tricks \nN = {n_decks}"
+    trick_plt = sns.heatmap(
+        trick_matrix,
+        cmap="coolwarm",
+        cbar=False,
+        annot=True,
+        linewidths=0.5,
+        xticklabels=ALL_COMBOS,
+        yticklabels=ALL_COMBOS,
+    )
+    trick_plt.set_title(trick_title)
+    plot_title = f"Heatmap for the {trick_title}"
+    # plotting card heatmap
+    card_title = f"Probability of Player Winning \n on Cards \nN = {n_decks}"
+    card_plt = sns.heatmap(
+        card_matrix,
+        cmap="coolwarm",
+        cbar=False,
+        annot=True,
+        linewidths=0.5,
+        xticklabels=ALL_COMBOS,
+        yticklabels=ALL_COMBOS,
+    )
+    card_plt.set_title(card_title)
+    plot_title2 = f"Heatmap for the {card_title}"
 
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=100)
+    # making file paths and saving the plots
+    trick_figure_path = PLOTS_DIR / plot_title
+    card_figure_path = PLOTS_DIR / plot_title2
+    trick_fig = trick_plt.get_figure()
+    card_fig = card_plt.get_figure()
+    trick_fig.savefig(trick_figure_path, bbox_inches="tight", facecolor="white")
+    card_fig.savefig(card_figure_path, bbox_inches="tight", facecolor="white")
 
-    heatmap_kws = {
-        "annot": True,
-        "fmt": ".1f",
-        "xticklabels": labels,
-        "yticklabels": labels,
-        "vmin": 0,
-        "vmax": 100,
-        "cbar_kws": {"shrink": 0.8},
-        "cmap": cmap,
-        "mask": mask,
-    }
-
-    sns.heatmap(trick_win_prob, ax=axes[0], **heatmap_kws)
-    axes[0].set_title("P2 Trick Win Probability (%)")
-    axes[0].set_xlabel("Player 1 Combination")
-    axes[0].set_ylabel("Player 2 Combination")
-
-    sns.heatmap(card_win_prob, ax=axes[1], **heatmap_kws)
-    axes[1].set_title("P2 Card Win Probability (%)")
-    axes[1].set_xlabel("Player 1 Combination")
-    axes[1].set_ylabel("Player 2 Combination")
-
-    plt.tight_layout()
-    if save:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        plot_path = PLOTS_DIR / f"heatmap_{timestamp}.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-        print(f"Saved heatmap to: {plot_path}")
-    if show:
-        plt.show()
-    else:
-        plt.close()
+    return trick_plt, card_plt

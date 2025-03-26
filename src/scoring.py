@@ -2,47 +2,37 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from src.helpers import ALL_COMBOS, TOTAL_COUNTS_FILE
-from src.processing import combo_to_str
 
 
-def score_summarize(
-    results_file: str | Path = TOTAL_COUNTS_FILE,
-) -> tuple[np.ndarray, np.ndarray]:
+def score_probability(total_counts_csv: str | Path = TOTAL_COUNTS_FILE):
     """
-    Reads game results from CSV, computes win percentages for tricks and cards, and returns summary.
+    Calculates the probabilities of P2 winning tricks and cards.
     ---
-    Arguments:
-        results_file (str | Path): path to the CSV file containing total counts
+    Args:
+        total_counts_csv (str): Path to the CSV file containing aggregated counts.
     Returns:
-        tuple[np.ndarray, np.ndarray]: two 2D arrays of win percentages for tricks and cards
+        tuple[np.ndarray, np.ndarray]: Two 2D arrays of win percentages for tricks and cards.
     """
-    results_df = pd.read_csv(results_file)
-    num_combos = len(ALL_COMBOS)
-    COMBO_STRINGS = [combo_to_str(combo) for combo in ALL_COMBOS]
-    trick_win_prob = np.zeros((num_combos, num_combos), dtype=float)
-    card_win_prob = np.zeros((num_combos, num_combos), dtype=float)
-
-    # iterating over all possible matchups
-    for i, p1_combo_str in enumerate(COMBO_STRINGS):
-        for j, p2_combo_str in enumerate(COMBO_STRINGS):
-            # skipping if the same combo
-            if p1_combo_str == p2_combo_str:
-                trick_win_prob[j, i] = np.nan
-                card_win_prob[j, i] = np.nan
+    results_df = pd.read_csv(total_counts_csv, dtype={"P1_combo": str, "P2_combo": str})
+    trick_array = np.zeros((8, 8))
+    card_array = np.zeros((8, 8))
+    for i, P1_combo in enumerate(ALL_COMBOS):  # filtering dataframe on p1
+        for j, P2_combo in enumerate(ALL_COMBOS):  # filtering dataframe on p2
+            if P1_combo == P2_combo:  # skipping same combo matchups
                 continue
-            matchup = results_df[
-                (results_df["P1_combo"] == p1_combo_str)
-                & (results_df["P2_combo"] == p2_combo_str)
-            ]
-            if len(matchup) == 0:
-                trick_win_prob[j, i] = np.nan
-                card_win_prob[j, i] = np.nan
-                continue
-            # computing win percentages for P2
-            p2_trick_wins = np.sum(matchup["P2_tricks"] > matchup["P1_tricks"])
-            p2_card_wins = np.sum(matchup["P2_cards"] > matchup["P1_cards"])
-
-            trick_win_prob[j, i] = (p2_trick_wins / len(matchup)) * 100
-            card_win_prob[j, i] = (p2_card_wins / len(matchup)) * 100
-
-    return trick_win_prob, card_win_prob
+            df_subset = results_df[
+                (results_df["P1_combo"] == P1_combo)
+                & (results_df["P2_combo"] == P2_combo)
+            ]  # ensuring combo matchups
+            total_matches = len(df_subset)  # total instances for the matchup
+            if total_matches > 0:
+                # counts wins and draws
+                p2_trick_wins = (df_subset["P2_tricks"] > df_subset["P1_tricks"]).sum()
+                p2_card_wins = (df_subset["P2_cards"] > df_subset["P1_cards"]).sum()
+                # calculates probabilities
+                trick_array[i, j] = p2_trick_wins / total_matches
+                card_array[i, j] = p2_card_wins / total_matches
+            else:
+                trick_array[i, j] = np.nan
+                card_array[i, j] = np.nan
+    return trick_array, card_array
