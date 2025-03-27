@@ -1,91 +1,74 @@
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from src.helpers import HALF_DECK_SIZE, TO_LOAD_DIR
+import json
+from src.helpers import HALF_DECK_SIZE, TO_LOAD_DIR, USED_SEEDS
 
 
 def get_decks(
-    n_decks: int = 1000, seed: int = 42, half_deck_size: int = HALF_DECK_SIZE
-) -> tuple[np.ndarray, np.ndarray]:
-    """Efficiently generates `n_decks` shuffled decks using NumPy.
-    ---
-    Args:
-        n_decks (int): number of shuffled decks to generate, default is 1000
-        seed (int): seed for random number generator, default is 42
-        half_deck_size (int): default is 26
+    n_decks: int = 1000, seed: int = 50, half_deck_size: int = HALF_DECK_SIZE
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """
+    Generates `n_decks` shuffled decks using NumPy.
     Returns:
-        tuple containing
-        decks (np.ndarray): 2D array of shape (n_decks, num_cards), each row is a shuffled deck
-        seeds (np.ndarray): Array of seeds used to shuffle the decks
+        decks, seeds (np.ndarray): 2D array of shape (n_decks, num_cards)
+        each row is a shuffled deck; array of seeds used to shuffle decks
     """
     init_deck = [0] * half_deck_size + [1] * half_deck_size
     decks = np.tile(init_deck, (int(n_decks), 1))
     rng = np.random.default_rng(seed)
     rng.permuted(decks, axis=1, out=decks)
     seeds = np.arange(seed, seed + n_decks, 1)
-    return decks, seeds
-
-
-def latest_deck_file(directory: Path = TO_LOAD_DIR) -> str | None:
-    """
-    Finds the most recent shuffled deck file based on the filename pattern in a given directory
-    ---
-    Args: directory (str): path to folder where the deck files are located
-    Returns: the most recent deck file or None if no files are found
-    """
-    files = sorted(Path(directory).glob("raw_decks_*.npz"))
-    return str(files[-1] if files else None)
+    return decks, seeds, n_decks
 
 
 def store_decks(
     decks: np.ndarray,
     seeds: np.ndarray,
-    directory: Path = TO_LOAD_DIR,
-    append_decks: bool = True,
+    n_decks: int,
+    deck_dir: Path = TO_LOAD_DIR,
+    seed_dir: Path = USED_SEEDS,
 ) -> None:
     """
     Stores shuffled decks with a datetime-based naming convention
     ---
     Args:
-        decks (np.ndarray): 2D array of shuffled decks to store
-        seeds (np.ndarray): Array of seeds associated with the decks
-        directory (str): Target directory to store the files
-        append_decks (bool): If True, appends to latest file; otherwise, creates a new file
+        decks, seeds (np.ndarray): 2D array of shuffled decks to store and
+        array of seeds associated with the decks
+        directory (Path): Target directory to store the files
     """
-    directory.mkdir(parents=True, exist_ok=True)
-    # converts decks to string format
-    decks_str = np.array(["".join(map(str, deck)) for deck in decks])
-    if append_decks:
-        # finds latest deck file in the directory
-        latest_file = latest_deck_file(directory)
-        if latest_file is None:  # if previous files is None, creates first file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_file = directory / f"raw_decks_{timestamp}.npz"
-            np.savez_compressed(new_file, decks=decks, decks_str=decks_str, seeds=seeds)
-            print(f"Stored first deck file: {new_file}")
-            return
-        data = np.load(latest_file)  # loads latest file if it exists
-        # checks if if decks and seeds exist in to_load file
-        if "decks" in data.files and "seeds" in data.files:
-            stored_decks = data["decks"].copy()
-            stored_seeds = data["seeds"].copy()
-            stored_decks_str = data["decks_str"].copy()
-
-            latest_used_seed = stored_seeds[-1]
-            new_seeds = np.arange(
-                latest_used_seed + 1, latest_used_seed + 1 + len(decks)
-            )
-            # append new decks
-            decks = np.vstack((stored_decks, decks))
-            decks_str = np.concatenate((stored_decks_str, decks_str))
-            seeds = np.concatenate((stored_seeds, new_seeds))
+    MAX_DPF = 10000  # DPF = Decks Per File
+    # checking file paths
+    deck_dir.mkdir(parents=True, exist_ok=True)
+    seed_dir.mkdir(parents=True, exist_ok=True)
+    # preventing deck size from exceeding storage limit via splitting into multiple files
+    if len(decks) > MAX_DPF:
+        num_splits = (len(decks) // MAX_DPF) + (1 if len(decks) % MAX_DPF > 0 else 0)
+        for i in range(num_splits):
+            start_idx = i * MAX_DPF
+            end_idx = min((i + 1) * MAX_DPF, len(decks))
+            timestamp = datetime.now().strftime(
+                "%Y%m%d_%H%M%S"
+            )  # creating new timestamped file
+            new_file = deck_dir / f"raw_{n_decks}_decks_{timestamp}_part{i + 1}.npz"
             np.savez_compressed(
-                latest_file, decks=decks, decks_str=decks_str, seeds=seeds
+                new_file, decks=decks[start_idx:end_idx], seeds=seeds[start_idx:end_idx]
             )
-            print(f"Updated existing deck file: {latest_file}")
-            return
+            # saving seeds to JSON file
+            seed_file = seed_dir / f"seeds_{timestamp}_part{i + 1}.json"
+            with open(seed_file, "w") as f:
+                json.dump(seeds[start_idx:end_idx].tolist(), f)
+            # print checks
+            print(f"Stored new deck file: {new_file}")
+            print(f"Stored seed file: {seed_file}")
+    else:
+        # creating single file if decks are within the limit
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        new_file = directory / f"raw_decks_{timestamp}.npz"
-        np.savez_compressed(new_file, decks=decks, decks_str=decks_str, seeds=seeds)
+        new_file = deck_dir / f"raw_{n_decks}_decks_{timestamp}.npz"
+        np.savez_compressed(new_file, decks=decks, seeds=seeds)
+        # saving seeds to a JSON file in seed directory
+        seed_file = seed_dir / f"seeds_{timestamp}.json"
+        with open(seed_file, "w") as f:
+            json.dump(seeds.tolist(), f)
         print(f"Stored new deck file: {new_file}")
-        return
+        print(f"Stored seed file: {seed_file}")
