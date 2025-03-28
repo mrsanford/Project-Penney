@@ -1,74 +1,56 @@
-import numpy as np
-from datetime import datetime
-from pathlib import Path
+import os
 import json
-from src.helpers import HALF_DECK_SIZE, TO_LOAD_DIR, USED_SEEDS
+import datetime
+from datetime import datetime
+import numpy as np
+from src.helpers import (HALF_DECK_SIZE,
+                         PATH_DATA_DECKS,
+                         PATH_DATA_SEEDS)
 
-
-def get_decks(
-    n_decks: int = 1000, seed: int = 50, half_deck_size: int = HALF_DECK_SIZE
-) -> tuple[np.ndarray, np.ndarray, int]:
+def generate_decks(n_decks: int = 1000, seed: int = 50) -> tuple[np.ndarray, np.ndarray]:
     """
-    Generates `n_decks` shuffled decks using NumPy.
-    Returns:
-        decks, seeds (np.ndarray): 2D array of shape (n_decks, num_cards)
-        each row is a shuffled deck; array of seeds used to shuffle decks
-    """
-    init_deck = [0] * half_deck_size + [1] * half_deck_size
-    decks = np.tile(init_deck, (int(n_decks), 1))
-    rng = np.random.default_rng(seed)
-    rng.permuted(decks, axis=1, out=decks)
-    seeds = np.arange(seed, seed + n_decks, 1)
-    return decks, seeds, n_decks
-
-
-def store_decks(
-    decks: np.ndarray,
-    seeds: np.ndarray,
-    n_decks: int,
-    deck_dir: Path = TO_LOAD_DIR,
-    seed_dir: Path = USED_SEEDS,
-) -> None:
-    """
-    Stores shuffled decks with a datetime-based naming convention
+    Generates shuffled decks of cards and used seeds
     ---
     Args:
-        decks, seeds (np.ndarray): 2D array of shuffled decks to store and
-        array of seeds associated with the decks
-        directory (Path): Target directory to store the files
+        n_decks (int) number of decks to generate
+        seed (int) starting seed for deck shuffling
+    Returns:
+        tuple[np.ndarray,np.ndarray] of shuffled decks and seeds
     """
-    MAX_DPF = 10000  # DPF = Decks Per File
-    # checking file paths
-    deck_dir.mkdir(parents=True, exist_ok=True)
-    seed_dir.mkdir(parents=True, exist_ok=True)
-    # preventing deck size from exceeding storage limit via splitting into multiple files
-    if len(decks) > MAX_DPF:
-        num_splits = (len(decks) // MAX_DPF) + (1 if len(decks) % MAX_DPF > 0 else 0)
-        for i in range(num_splits):
-            start_idx = i * MAX_DPF
-            end_idx = min((i + 1) * MAX_DPF, len(decks))
-            timestamp = datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )  # creating new timestamped file
-            new_file = deck_dir / f"raw_{n_decks}_decks_{timestamp}_part{i + 1}.npz"
-            np.savez_compressed(
-                new_file, decks=decks[start_idx:end_idx], seeds=seeds[start_idx:end_idx]
-            )
-            # saving seeds to JSON file
-            seed_file = seed_dir / f"seeds_{timestamp}_part{i + 1}.json"
-            with open(seed_file, "w") as f:
-                json.dump(seeds[start_idx:end_idx].tolist(), f)
-            # print checks
-            print(f"Stored new deck file: {new_file}")
-            print(f"Stored seed file: {seed_file}")
-    else:
-        # creating single file if decks are within the limit
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        new_file = deck_dir / f"raw_{n_decks}_decks_{timestamp}.npz"
-        np.savez_compressed(new_file, decks=decks, seeds=seeds)
-        # saving seeds to a JSON file in seed directory
-        seed_file = seed_dir / f"seeds_{timestamp}.json"
-        with open(seed_file, "w") as f:
-            json.dump(seeds.tolist(), f)
-        print(f"Stored new deck file: {new_file}")
-        print(f"Stored seed file: {seed_file}")
+    init_deck = [0] * HALF_DECK_SIZE + [1] * HALF_DECK_SIZE
+    decks = np.tile(init_deck, (n_decks, 1))
+    rng = np.random.default_rng(seed)
+    rng.permuted(decks, axis=1, out=decks)
+    seeds = np.arange(seed, seed + n_decks)
+    return decks, seeds
+
+def store_decks(n_decks: int = 1000, seed: int = 50) -> None:
+    """
+    Stores generated decks with timestamped filenames
+    ---
+    Args: same as generate_decks()
+    Returns: None
+    """
+    os.makedirs(PATH_DATA_DECKS, exist_ok=True)
+    os.makedirs(PATH_DATA_SEEDS, exist_ok=True)
+    MAX_DECKS_PER_FILE = 10000
+    decks, seeds = generate_decks(n_decks, seed)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # calculate number of files needed
+    num_files = (n_decks + MAX_DECKS_PER_FILE - 1) // MAX_DECKS_PER_FILE
+    for file_num in range(num_files):
+        start_idx = file_num * MAX_DECKS_PER_FILE
+        end_idx = min((file_num + 1) * MAX_DECKS_PER_FILE, n_decks)
+        # saving deck chunk
+        deck_filename = f"{n_decks}_decks_{timestamp}_part{file_num+1}.npz"
+        np.savez_compressed(
+            os.path.join(PATH_DATA_DECKS, deck_filename),
+            decks=decks[start_idx:end_idx]
+        )
+        # saving seed chunk
+        seed_filename = f"seeds_{timestamp}_part{file_num+1}.json"
+        with open(os.path.join(PATH_DATA_SEEDS, seed_filename), 'w') as f:
+            json.dump(seeds[start_idx:end_idx].tolist(), f)
+        print(f"Stored {end_idx-start_idx} decks in {deck_filename}")
+    print(f"Finished storing all {n_decks} decks across {num_files} files")
+    return None
