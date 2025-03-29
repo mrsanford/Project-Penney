@@ -19,10 +19,8 @@ def project_penney(n_decks: int = 10000, seed: int = 15):
         all_decks = np.vstack([prev_decks, new_decks])
     # optional: saving new ones
     store_decks(n_decks=n_decks, seed=seed)
-    # getting total number of stored decks by filename (e.g., 1000 + 1000 + ...)
-    stored_count = get_n_decks()
+    
     # plotting results using all decks, showing total deck count in title
     plot_results(all_decks)
-
 if __name__ == '__main__':
     project_penney(n_decks=1000000, seed=1)
