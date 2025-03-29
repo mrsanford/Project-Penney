@@ -1,8 +1,8 @@
 # **Project Penney Overview**
 
 This version of Project Penney is a 3-bit simulation where two players compete by selecting sequences of three binary playing card values:
-- RED = 0
-- BLACK = 1
+- **RED = 0**
+- **BLACK = 1**
 
 The goal of the project is to simulate *n* Penney games and to visualize player combination probabilities. Each simulation shuffles a deck of 52 cards (26 red, 26 black), and the game is played by searching for each player's sequence within this shuffled deck. **The player whose sequence appears first in the deck will will a trick.**
 
