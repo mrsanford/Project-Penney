@@ -19,4 +19,4 @@ def project_penney(n_decks: int = 10000, seed: int = 15):
     plot_results(all_decks) # run simulations and visualize win probabilities
 
 if __name__ == '__main__':
-    project_penney(n_decks=1000, seed=1)
+    project_penney(n_decks=1000000, seed=1)
