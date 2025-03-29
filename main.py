@@ -1,6 +1,6 @@
 from src.datagen import gen_decks, store_decks
-from src.visualization import plot_results, get_n_decks
-from src.processing import load_decks
+from src.visualization import plot_results
+from src.processing import load_decks, score_game
 import numpy as np
 
 def project_penney(n_decks: int = 10000, seed: int = 15):
@@ -22,5 +22,6 @@ def project_penney(n_decks: int = 10000, seed: int = 15):
     
     # plotting results using all decks, showing total deck count in title
     plot_results(all_decks)
+
 if __name__ == '__main__':
     project_penney(n_decks=1000000, seed=1)

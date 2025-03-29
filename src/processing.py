@@ -33,39 +33,38 @@ def score_game(deck: np.ndarray, p1_combo: list, p2_combo: list) -> tuple:
     Returns:
         tuple with trick and card counts for both players
     """
-    p1_tricks_score = p2_tricks_score = p1_cards_score = p2_cards_score = 0 
+    p1_tricks_score = p2_tricks_score = 0
+    p1_cards_score = p2_cards_score = 0
     pos = 0
     combo_len = len(p1_combo)
     deck_len = len(deck)
-    last_p1_match = -1
-    last_p2_match = -1
+    last_trick_end = 0
 
     while pos <= deck_len - combo_len:
-        current_window = deck[pos:pos+combo_len]
-        p1_match = np.array_equal(current_window, p1_combo)
-        p2_match = np.array_equal(current_window, p2_combo)
-        if p1_match:
+        window = deck[pos:pos + combo_len]
+        if np.array_equal(window, p1_combo):
             p1_tricks_score += 1
-            # counts cards since last match + combo length
-            if last_p1_match == -1:
-                p1_cards_score += pos + combo_len
-            else:
-                p1_cards_score += (pos - last_p1_match) + combo_len
-            last_p1_match = pos
-            pos += 1  # allowing overlaps and not just incremental, every 3 cards
-        elif p2_match:
+            trick_end = pos + combo_len - 1
+            cards_won = trick_end - last_trick_end + 1
+            p1_cards_score += cards_won
+            last_trick_end = trick_end + 1
+            pos = trick_end + 1
+        elif np.array_equal(window, p2_combo):
             p2_tricks_score += 1
-            if last_p2_match == -1:
-                p2_cards_score += pos + combo_len
-            else:
-                p2_cards_score += (pos - last_p2_match) + combo_len
-            last_p2_match = pos
-            pos += 1
+            trick_end = pos + combo_len - 1
+            cards_won = trick_end - last_trick_end + 1
+            p2_cards_score += cards_won
+            last_trick_end = trick_end + 1
+            pos = trick_end + 1
         else:
             pos += 1
-    trick_tie = 1 if p1_tricks_score == p2_tricks_score else 0
-    card_tie = 1 if p1_cards_score == p2_cards_score else 0
-    return p1_tricks_score, p1_cards_score, p2_tricks_score, p2_cards_score, trick_tie, card_tie
+    trick_tie = int(p1_tricks_score == p2_tricks_score)
+    card_tie = int(p1_cards_score == p2_cards_score)
+    return (
+        p1_tricks_score, p1_cards_score,
+        p2_tricks_score, p2_cards_score,
+        trick_tie, card_tie
+    )
             
 
 def simulate_games(decks: np.ndarray, p1_combo: list, p2_combo: list) -> tuple:
