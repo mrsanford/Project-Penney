@@ -3,6 +3,7 @@ from datetime import datetime as dt
 
 # Constants
 ALL_COMBOS = ['000', '001', '010', '011', '100', '101', '110', '111']
+ALL_COMBOS_COLOR = ['RRR', 'RRB', 'RBR', 'RBB', 'BRR', 'BRB', 'BBR', 'BBB']
 HALF_DECK_SIZE = 26
 PATH_DATA_DECKS = 'data/decks'
 PATH_DATA_SEEDS = 'data/seeds'

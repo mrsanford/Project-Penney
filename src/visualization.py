@@ -3,7 +3,7 @@ import os
 import glob
 import re
 import matplotlib.pyplot as plt
-from src.helpers import ALL_COMBOS, PATH_DATA_DECKS
+from src.helpers import ALL_COMBOS, ALL_COMBOS_COLOR, PATH_DATA_DECKS
 from src.processing import aggregate_results
 
 
@@ -16,11 +16,13 @@ def get_n_decks(path: str = PATH_DATA_DECKS) -> int:
     """
     total_num_decks = 0
     pattern = os.path.join(path, '*_decks_*_part*.npz')
+    # iterates through all files matching the naming pattern
     for file in glob.glob(pattern):
+        # extracting the prefix number
         filename = os.path.basename(file)
         match = re.match(r'^(\d+)_decks_', filename)
         if match:
-            total_num_decks += int(match.group(1))
+            total_num_decks += int(match.group(1)) # adding to total deck count
     return total_num_decks
 
 
@@ -35,10 +37,10 @@ def prep_heatmaps(decks: np.ndarray) -> dict[str, np.ndarray]:
     Results:
         dict[str, np.ndarray]: dictionary of six 8x8 matrices 
     """
-    # running full scoring simulation
+    # running simulations to get trick, card, tie results
     tricks_results, cards_results = aggregate_results(decks)
 
-    # creating empty 8x8 matrices for all results
+    # initializing empty matrices for results
     shape = (len(ALL_COMBOS), len(ALL_COMBOS))
     tricks_matrix_p1 = np.full(shape, np.nan)
     tricks_matrix_p2 = np.full(shape, np.nan)
@@ -47,23 +49,24 @@ def prep_heatmaps(decks: np.ndarray) -> dict[str, np.ndarray]:
     cards_matrix_p2 = np.full(shape, np.nan)
     cards_matrix_tie = np.full(shape, np.nan)
 
-    # indexing for combo placement in matrix
+    # creating index mapping from combo string to matrix index
     combo_to_index = {combo: i for i, combo in enumerate(ALL_COMBOS)}
     
-    # putting trick results into the matrices
+    # filling trick results in the matrices
     for p1_combo, p2_combo, p1_trick_pct, p2_trick_pct, trick_tie_pct in tricks_results:
         row = combo_to_index[p1_combo]
         col = combo_to_index[p2_combo]
         tricks_matrix_p1[row, col] = p1_trick_pct
         tricks_matrix_p2[row, col] = p2_trick_pct
         tricks_matrix_tie[row, col] = trick_tie_pct
-    # putting card results into the matrices
+    # filling card results in the matrices
     for p1_combo, p2_combo, p1_card_pct, p2_card_pct, card_tie_pct in cards_results:
         row = combo_to_index[p1_combo]
         col = combo_to_index[p2_combo]
         cards_matrix_p1[row, col] = p1_card_pct
         cards_matrix_p2[row, col] = p2_card_pct
         cards_matrix_tie[row, col] = card_tie_pct
+    # returning all matrices via dictionary
     return {
         'tricks_p1': tricks_matrix_p1,
         'tricks_p2': tricks_matrix_p2,
@@ -76,14 +79,12 @@ def prep_heatmaps(decks: np.ndarray) -> dict[str, np.ndarray]:
 
 def plot_results(decks: np.ndarray) -> None:
     """
-    Plots annotated heatmaps for P2 Win(Draw)
-    probabilities on tricks and cards
+    Plots annotated heatmaps for P2 Win(Draw) probabilities on tricks and cards
     ---
     Args:
         decks (np.ndarray) are the  decks to analyze.
     Returns: None
     """
-    ALL_COMBOS_COLOR = ['RRR', 'RRB', 'RBR', 'RBB', 'BRR', 'BRB', 'BBR', 'BBB']
     num_combos = len(ALL_COMBOS_COLOR)
     results = prep_heatmaps(decks)
 
@@ -96,7 +97,7 @@ def plot_results(decks: np.ndarray) -> None:
 
     def format_matrix(win_matrix:  np.ndarray, tie_matrix:  np.ndarray) -> np.ndarray:
         """
-        Formatting the matrix to put wins and ties on together
+        Formatting the matrix to display win and draw together
         ---
         Args:
             win_matrix (np.ndarray) is win percentage matrix
@@ -108,11 +109,11 @@ def plot_results(decks: np.ndarray) -> None:
         for i in range(win_matrix.shape[0]):
             for j in range(win_matrix.shape[1]):
                 if np.isnan(win_matrix[i, j]):
-                    formatted[i, j] = ""
+                    formatted[i, j] = "" # leaving blank if diagonal
                 else:
                     win_pct = f"{100 * win_matrix[i, j]:.0f}"
                     tie_pct = f"{100 * tie_matrix[i, j]:.0f}"
-                    formatted[i, j] = f"{win_pct}({tie_pct})"
+                    formatted[i, j] = f"{win_pct}({tie_pct})" # annotating as win(draw)
         return formatted
 
     def plot_heatmap(data_matrix: np.ndarray, annotations: np.ndarray, title: str) -> plt.Figure:
@@ -126,20 +127,24 @@ def plot_results(decks: np.ndarray) -> None:
         Returns: the figure
         """
         fig, ax = plt.subplots(figsize=(10, 8))
+
+        # creating and masking the colormap
         cmap = plt.cm.Greens
         cmap = cmap.copy()
-        cmap.set_bad(color='lightgrey')
+        cmap.set_bad(color='lightgrey') # coloring diagonals grey
         masked_matrix = np.ma.masked_invalid(data_matrix)
         cax = ax.imshow(masked_matrix, cmap=cmap, vmin=0, vmax=1)
 
+        # setting up ticks and labels
         ax.set_xticks(np.arange(num_combos))
         ax.set_yticks(np.arange(num_combos))
         ax.set_xticklabels(ALL_COMBOS_COLOR)
         ax.set_yticklabels(ALL_COMBOS_COLOR)
         ax.set_xlabel("P2 Choice")
         ax.set_ylabel("P1 Choice")
-
+        # rotating x-labels for readability
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        # adding text annotations to heatmap
         for i in range(num_combos):
             for j in range(num_combos):
                 if annotations[i, j] != "":
@@ -147,11 +152,13 @@ def plot_results(decks: np.ndarray) -> None:
         ax.set_title(title)
         plt.tight_layout()
         return fig
-    # getting the number of decks for the titles
+    
+    # getting total number of decks
     num_decks = get_n_decks()
-    # creating formatted text for annotations
+    # formatting matrices
     cards_formatted = format_matrix(results['cards_p2'], results['cards_tie'])
     tricks_formatted = format_matrix(results['tricks_p2'], results['tricks_tie'])
+    
     # plotting and showing both heatmaps
     fig1 = plot_heatmap(
         results['cards_p2'], cards_formatted,
@@ -160,5 +167,9 @@ def plot_results(decks: np.ndarray) -> None:
         results['tricks_p2'], tricks_formatted,
         f"Player 2's Win(Draw) Probabilities \n on Tricks \n on {num_decks:,} Decks"
     )
+    # saving figures to disk
     fig1.savefig(f"plots/Card_Heatmap.png", dpi=300)
     fig2.savefig(f"plots/Trick_Heatmap.png", dpi=300)
+    
+    # option to visualize plots immediately
+    plt.show()
