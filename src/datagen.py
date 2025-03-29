@@ -38,13 +38,15 @@ def store_decks(n_decks: int = 1000, seed: int = 50) -> None:
     MAX_DECKS_PER_FILE = 10000
     decks, seeds = gen_decks(n_decks, seed)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # calculate number of files needed
+    
+    # calculating the number of files needed
     num_files = (n_decks + MAX_DECKS_PER_FILE - 1) // MAX_DECKS_PER_FILE
     for file_num in range(num_files):
         start_idx = file_num * MAX_DECKS_PER_FILE
         end_idx = min((file_num + 1) * MAX_DECKS_PER_FILE, n_decks)
-        # saving deck chunk
-        deck_filename = f"{n_decks}_decks_{timestamp}_part{file_num+1}.npz"
+        num_decks_in_file = end_idx - start_idx
+        # ensuring the correct number of decks per file
+        deck_filename = f"{num_decks_in_file}_decks_{timestamp}_part{file_num + 1}.npz"
         np.savez_compressed(
             os.path.join(PATH_DATA_DECKS, deck_filename),
             decks=decks[start_idx:end_idx]

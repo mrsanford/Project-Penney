@@ -3,7 +3,7 @@ from src.visualization import plot_results, get_n_decks
 from src.processing import load_decks
 import numpy as np
 
-def project_penney(n_decks: int = 1000, seed: int = 42):
+def project_penney(n_decks: int = 10000, seed: int = 15):
     """
     Complete workflow: generates decks, stores them, loads existing ones,
     runs simulations, and visualizes the result as annotated heatmaps.
@@ -22,7 +22,7 @@ def project_penney(n_decks: int = 1000, seed: int = 42):
     # getting total number of stored decks by filename (e.g., 1000 + 1000 + ...)
     stored_count = get_n_decks()
     # plotting results using all decks, showing total deck count in title
-    plot_results(all_decks, num_decks=stored_count + len(new_decks))
+    plot_results(all_decks)
 
 if __name__ == '__main__':
-    project_penney(n_decks=1500, seed=1)
+    project_penney(n_decks=1000000, seed=1)
