@@ -85,5 +85,6 @@ plot_results(decks)
 Heatmaps will be saved to ```/plots``` as:
 * ```Card_Heatmap.png```
 * ```Trick_Heatmap.png```
+
 Each cell will show P2's Win(Draw) percentages, rounded to the nearest whole number:
 * e.g. ```85(5)``` corresponds to **85% win, 5% draw**
