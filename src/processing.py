@@ -1,201 +1,144 @@
 import numpy as np
-import pandas as pd
-from pathlib import Path
-import glob
 import os
-import re
-from src.helpers import (
-    TO_LOAD_DIR,
-    LOADED_DIR,
-    VALID_COMBOS,
-    MASTER_CSV_FILE,
-    MASTER_CSV_PATH,
-)
+import glob
+from src.helpers import ALL_COMBOS, PATH_DATA, HALF_DECK_SIZE
 
 
-def get_num_decks(target_dir: Path = LOADED_DIR) -> int:
+def load_decks(data_dir: str= PATH_DATA) -> np.ndarray:
     """
-    Gets the total number of decks that have been processed
-    ---
-    Args: target_dir (Path) points to loaded folder
-    Returns: int value of the total number of decks
-    """
-    total_decks = 0
-    pattern = re.compile(r"processed_(\d+)_decks_.*_part\d+\.npz")
-    for file in target_dir.glob("processed_*_decks_*_part*.npz"):
-        match = pattern.search(file.name)
-        if match:
-            total_decks += int(match.group(1))
-    return total_decks
-
-
-def find_seq(decks: str, combo: str, start: int = 0):
-    """
-    Finds the first occurrence of a combo in the deck
-    ---
-    Returns: int: index of first occurrence
-    """
-    if isinstance(decks, np.ndarray):
-        decks = "".join(map(str, decks))
-    idx = decks.find(combo, start)
-    return idx
-
-
-def score_deck(decks: str, P1_combo: str, P2_combo: str) -> dict:
-    """
-    Scores a single game and returns combos, trick and card wins
-    ---
-    Returns: dict: results of a single game (player combos, trick and card wins, and any ties)
-    """
-    P1_pos = find_seq(decks, P1_combo)
-    P2_pos = find_seq(decks, P2_combo)
-    # initializing the counters
-    P1_cards = P2_cards = 0
-    P1_tricks = P2_tricks = 0
-    trick_tie = card_tie = 0
-    pos = 0
-    while P1_pos != -1 and P2_pos != -1:
-        if P1_pos == P2_pos:
-            continue
-        elif P1_pos < P2_pos:
-            P1_cards += P1_pos + 3 - pos
-            P1_tricks += 1
-            pos = P1_pos + 3
-        elif P2_pos < P1_pos:
-            P2_cards += P2_pos + 3 - pos
-            P2_tricks += 1
-            pos = P2_pos + 3
-        P1_pos = find_seq(decks, P1_combo, pos)
-        P2_pos = find_seq(decks, P2_combo, pos)
-    # checking for trick and card ties AFTER the game ends
-    trick_tie = 1 if P1_tricks == P2_tricks else 0
-    card_tie = 1 if P1_cards == P2_cards else 0
-    return {
-        "P1_combo": P1_combo,
-        "P2_combo": P2_combo,
-        "P1_tricks": P1_tricks,
-        "P2_tricks": P2_tricks,
-        "P1_cards": P1_cards,
-        "P2_cards": P2_cards,
-        "trick_tie": trick_tie,
-        "card_tie": card_tie,
-    }
-
-
-def process_decks(decks_str: np.ndarray) -> tuple[dict, dict, dict, dict, int]:
-    """
-    Processes all decks, scores them, updates total_counts.csv, and summarizes results
-    ---
-    Args: decks_str (np.ndarray): string representations of decks stored in np.arrays
-    Returns: tuple: (DataFrame with detailed scores, number of decks processed)
-    """
-    # initializing counters and dicts for separate win and tie stats
-    trick_wins = {}
-    card_wins = {}
-    trick_ties = {}
-    card_ties = {}
-    # generating valid (P1_combo, P2_combo) pairs
-    for deck_str in decks_str:
-        for P1_combo, P2_combo in VALID_COMBOS:
-            score = score_deck(deck_str, P1_combo, P2_combo)
-            # initializes combinations if they don't exist in the dict
-            if (P1_combo, P2_combo) not in trick_wins:
-                trick_wins[(P1_combo, P2_combo)] = {"P1_tricks": 0, "P2_tricks": 0}
-                card_wins[(P1_combo, P2_combo)] = {"P1_cards": 0, "P2_cards": 0}
-                trick_ties[(P1_combo, P2_combo)] = {"trick_tie": 0}
-                card_ties[(P1_combo, P2_combo)] = {"card_tie": 0}
-            # accumulating tricks and cards per player
-            trick_wins[(P1_combo, P2_combo)]["P1_tricks"] += score["P1_tricks"]
-            trick_wins[(P1_combo, P2_combo)]["P2_tricks"] += score["P2_tricks"]
-            card_wins[(P1_combo, P2_combo)]["P1_cards"] += score["P1_cards"]
-            card_wins[(P1_combo, P2_combo)]["P2_cards"] += score["P2_cards"]
-            # incrementing tie counters
-            if score["P1_tricks"] == score["P2_tricks"]:
-                trick_ties[(P1_combo, P2_combo)]["trick_tie"] += 1
-            if score["P1_cards"] == score["P2_cards"]:
-                card_ties[(P1_combo, P2_combo)]["card_tie"] += 1
-    return trick_wins, card_wins, trick_ties, card_ties
-
-
-def update_counts(
-    trick_wins: dict,
-    card_wins: dict,
-    trick_ties: dict,
-    card_ties: dict,
-    master_csv_path: Path = MASTER_CSV_PATH,
-    master_csv_file: str = MASTER_CSV_FILE,
-) -> pd.DataFrame:
-    """
-    Updates the master CSV with trick and card win/loss/tie counts
-    Note: combos have been encoded as numeric indices
+    Loads decks as binary arrays
     ---
     Args:
-        trick_wins, card_wins, trick_ties, card_ties (dict) contains trick and card wins, trick and card ties
-        master_csv_path (Path) to the total_counts.csv
-    Returns: pd.DataFrame of the updated dataframe
+        data_dir (str) is the target path to the data folder
+    Returns:
+        list of strings representing decks
     """
-    combined_data = []
-    # collecting all the unique (P1, P2 combo) pairs from all dictionaries
-    all_combos = (
-        set(trick_wins.keys())
-        | set(card_wins.keys())
-        | set(trick_ties.keys())
-        | set(card_ties.keys())
-    )
-    for P1_combo, P2_combo in all_combos:
-        row = {
-            "P1_index": int(P1_combo, 2),
-            "P2_index": int(P2_combo, 2),
-            "P1_tricks": trick_wins.get((P1_combo, P2_combo), {}).get("P1_tricks", 0),
-            "P2_tricks": trick_wins.get((P1_combo, P2_combo), {}).get("P2_tricks", 0),
-            "P1_cards": card_wins.get((P1_combo, P2_combo), {}).get("P1_cards", 0),
-            "P2_cards": card_wins.get((P1_combo, P2_combo), {}).get("P2_cards", 0),
-            "trick_tie": trick_ties.get((P1_combo, P2_combo), {}).get("trick_tie", 0),
-            "card_tie": card_ties.get((P1_combo, P2_combo), {}).get("card_tie", 0),
-        }
-        combined_data.append(row)
-    df_new = pd.DataFrame(combined_data)
-    column_order = [
-        "P1_index",
-        "P2_index",
-        "P1_tricks",
-        "P2_tricks",
-        "P1_cards",
-        "P2_cards",
-        "trick_tie",
-        "card_tie",
-    ]  # ensuring correct column order
-    df_new = df_new[column_order]
-
-    # ensuring master CSV exists
-    if master_csv_path.exists():
-        df_existing = pd.read_csv(master_csv_file)
-        # checking proper column alignment
-        missing_columns = set(column_order) - set(df_existing.columns)
-        if missing_columns:
-            print(f"Warning: Missing columns in existing CSV: {missing_columns}")
-        # appending the new data
-        df_updated = pd.concat([df_existing, df_new], ignore_index=True)
-    else:  # first-time creation
-        df_updated = df_new
-    # saving to csv
-    df_updated.to_csv(master_csv_file, index=False)
-    print(f"Successfully updated {master_csv_file} with new results.")
-    moving_files()
-    return df_updated
+    decks = []
+    for file in glob.glob(os.path.join(data_dir, '*.npz')):
+        with np.load(file) as data:
+            decks.append(data['decks'])
+    if not decks:
+        print(f"[load_decks] No deck files found in {data_dir}. Returning empty array.")
+        return np.empty((0, HALF_DECK_SIZE*2), dtype=int)
+    return np.vstack(decks)
 
 
-def moving_files(
-    to_load_dir: Path = TO_LOAD_DIR, loaded_dir: Path = LOADED_DIR
-) -> None:
+def score_game(deck: np.ndarray, p1_combo: list, p2_combo: list) -> tuple:
     """
-    Moves raw files from TO_LOAD_DIR to LOADED_DIR
-    once processed and appends processed tag
+    Scores a single game between two players' combos in a deck
+    ---
+    Args:
+        deck_str (np.ndarray) is the representation of the deck
+        p1_combo, p2_combo (list) is P1, P2's combo pattern
+    Returns:
+        tuple with trick and card counts for both players
     """
-    loaded_dir.mkdir(parents=True, exist_ok=True)
-    for npz_file in to_load_dir.glob("*.npz"):
-        new_filename = npz_file.name.replace("raw_", "processed_")
-        target_file = loaded_dir / new_filename
-        os.rename(npz_file, target_file)
-        print(f"Moved and renamed {npz_file} to {target_file}")
-        return None
+    p1_tricks_score = p2_tricks_score = p1_cards_score = p2_cards_score = 0 
+    pos = 0
+    combo_len = len(p1_combo)
+    deck_len = len(deck)
+    last_p1_match = -1
+    last_p2_match = -1
+
+    while pos <= deck_len - combo_len:
+        current_window = deck[pos:pos+combo_len]
+        p1_match = np.array_equal(current_window, p1_combo)
+        p2_match = np.array_equal(current_window, p2_combo)
+        if p1_match:
+            p1_tricks_score += 1
+            # counts cards since last match + combo length
+            if last_p1_match == -1:
+                p1_cards_score += pos + combo_len
+            else:
+                p1_cards_score += (pos - last_p1_match) + combo_len
+            last_p1_match = pos
+            pos += 1  # allowing overlaps and not just incremental, every 3 cards
+        elif p2_match:
+            p2_tricks_score += 1
+            if last_p2_match == -1:
+                p2_cards_score += pos + combo_len
+            else:
+                p2_cards_score += (pos - last_p2_match) + combo_len
+            last_p2_match = pos
+            pos += 1
+        else:
+            pos += 1
+    trick_tie = 1 if p1_tricks_score == p2_tricks_score else 0
+    card_tie = 1 if p1_cards_score == p2_cards_score else 0
+    return p1_tricks_score, p1_cards_score, p2_tricks_score, p2_cards_score, trick_tie, card_tie
+            
+
+def simulate_games(decks: np.ndarray, p1_combo: list, p2_combo: list) -> tuple:
+    """
+    "Simulates the game on every deck in decks
+    ---
+    Args: same args as score_game()
+    Returns: tuple containing lists of trick and card records
+    """
+    tricks_record = []
+    cards_record = []
+    for deck in decks:
+        (p1_tricks_score, p1_cards_score,
+         p2_tricks_score, p2_cards_score, trick_tie, card_tie) = score_game(deck, p1_combo, p2_combo)
+        tricks_record.append((p1_tricks_score, p2_tricks_score, trick_tie))
+        cards_record.append((p1_cards_score,p2_cards_score,card_tie))
+    return tricks_record, cards_record
+
+
+def calc_probability(decks:np.ndarray, p1_combo:list, p2_combo:list) -> list:
+    """
+    Calculates the win and draw percentages for both players, even though
+    only P2 will ultimately be calculated
+    ---
+    Args: same parameters as simulate_games()
+    Returns: list of win and draw percentages
+    """
+    tricks, cards = simulate_games(decks, p1_combo, p2_combo)
+    tricks_scores = np.array(tricks)
+    cards_scores = np.array(cards)
+    total_games = len(decks)
+
+    # trick scores
+    p1_tricks_wins = np.sum(tricks_scores[:, 0] > tricks_scores[:, 1])
+    p2_tricks_wins = np.sum(tricks_scores[:, 1] > tricks_scores[:, 0])
+    trick_ties = np.sum(tricks_scores[:, 2] == 1)
+    # card scores
+    p1_cards_wins = np.sum(cards_scores[:, 0] > cards_scores[:, 1])
+    p2_cards_wins = np.sum(cards_scores[:, 1] > cards_scores[:, 0])
+    card_ties = np.sum(cards_scores[:, 2] == 1)
+
+    return [
+        p1_tricks_wins / total_games,
+        p2_tricks_wins / total_games,
+        trick_ties / total_games,
+        p1_cards_wins / total_games,
+        p2_cards_wins / total_games,
+        card_ties / total_games,
+    ]
+
+
+def aggregate_results(decks: np.ndarray) -> tuple[list, list]:
+    """
+    Runs simulations for all valid P1 vs P2 combo matchups excluding
+    invalid matchups
+    ---
+    Args:
+        decks (np.ndarray): all decks
+    Returns
+        tuple of two lists: (trick_results, cards_results)
+    """
+    tricks_results = []
+    cards_results = []
+    for p1_combo in ALL_COMBOS:
+        for p2_combo in ALL_COMBOS:  
+            if p1_combo == p2_combo:
+                continue
+            p1_combo_array = np.array(list(p1_combo), dtype=int)
+            p2_combo_array = np.array(list(p2_combo), dtype=int)
+            (
+                p1_trick_pct, p2_trick_pct, trick_tie_pct,
+                p1_card_pct, p2_card_pct, card_tie_pct
+            ) = calc_probability(decks, p1_combo_array, p2_combo_array)
+            tricks_results.append((p1_combo, p2_combo, p1_trick_pct, p2_trick_pct, trick_tie_pct))
+            cards_results.append((p1_combo, p2_combo, p1_card_pct, p2_card_pct, card_tie_pct))
+    return tricks_results, cards_results
