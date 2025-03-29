@@ -126,7 +126,7 @@ def plot_results(decks: np.ndarray) -> None:
         Returns: the figure
         """
         fig, ax = plt.subplots(figsize=(10, 8))
-        cmap = plt.cm.coolwarm
+        cmap = plt.cm.Greens
         cmap = cmap.copy()
         cmap.set_bad(color='lightgrey')
         masked_matrix = np.ma.masked_invalid(data_matrix)
@@ -136,8 +136,8 @@ def plot_results(decks: np.ndarray) -> None:
         ax.set_yticks(np.arange(num_combos))
         ax.set_xticklabels(ALL_COMBOS_COLOR)
         ax.set_yticklabels(ALL_COMBOS_COLOR)
-        ax.set_xlabel("Player 2's Choice")
-        ax.set_ylabel("Player 1's Choice")
+        ax.set_xlabel("P2 Choice")
+        ax.set_ylabel("P1 Choice")
 
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
         for i in range(num_combos):
