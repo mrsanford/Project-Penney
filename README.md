@@ -19,7 +19,7 @@ Since Player 1 (P1) selectes their sequence, Player 2 (P2) has a strategic advan
 ## **Features**
 
 ### Deck Generation and Storage
-Efficient generation of large numbers of shuffled decks and reproducible seeds. Decks are saved in compressed ```.npz``` files and stored in the decks subfolder within its parent [/data](https://github.com/mrsanford/Project-Penney/tree/main/data) folder. Per-file prefixes indicating the actual number of contained decks. Decks with lengths exceeding >10000 decks are automatically split across multiple files to accomodate GitHub's storage limits.
+Efficient generation of large numbers of shuffled decks and reproducible seeds. Decks are saved in compressed ```.npz``` files and stored in the decks subfolder within its parent ```/data``` folder. Per-file prefixes indicating the actual number of contained decks. Decks with lengths exceeding >10000 decks are automatically split across multiple files to accomodate GitHub's storage limits.
 
 ### Game Simulation
 All 56 valid combinations of P1 vs. P2 (omitting self-matches) are simulated across every shuffled deck. More information regarding statistics of combination win probabilties can be found [here](https://en.wikipedia.org/wiki/Penney%27s_game#/media/File:Penney_game_graphs.svg). Win/draw probabilities for both tricks and cards are computed and stored. 
