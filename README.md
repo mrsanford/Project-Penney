@@ -13,7 +13,7 @@ Points are awarded in **two ways:**
 #### Game Mechanics:
 
 Since Player 1 (P1) selectes their sequence, Player 2 (P2) has a strategic advantage in selecting a counter-sequence to maximize their probability of winning or at least forcing a draw. This advantage is represented in the selection formula:
-    - If P1 chooses ```[1, 2, 1]```, the optimal response for P2 is ```[-2, 1, 2]```
+- If P1 chooses ```[1, 2, 1]```, the optimal response for P2 is ```[-2, 1, 2]```
 
     
 ## **Features**
